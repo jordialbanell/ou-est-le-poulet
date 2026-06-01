@@ -3,6 +3,7 @@ import { BARS, ZONE_ORDER, ZONES, type Zone } from "../lib/data";
 import { checkInBar, undoCheckIn } from "../lib/actions";
 import type { BarCheckin } from "../lib/types";
 import { CheckInModal } from "./CheckInModal";
+import { useToast } from "./Toast";
 
 const PHOTO_REQUIRED_BARS = 6;
 
@@ -18,9 +19,9 @@ export function BarsTab({
   teamId: string;
   checkins: BarCheckin[];
 }) {
+  const toast = useToast();
   const [openZones, setOpenZones] = useState<Set<Zone>>(new Set<Zone>(["A"]));
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
   // Optimistic overrides: bar name -> desired checked state while a write is in flight.
   const [override, setOverride] = useState<Record<string, boolean>>({});
   // Bar awaiting a drink photo before its check-in completes.
@@ -56,14 +57,14 @@ export function BarsTab({
 
   /** Optimistically check in (with optional drink evidence) and persist. */
   async function doCheckIn(barName: string, zone: Zone, evidenceUrl?: string, note?: string) {
-    setError(null);
     setBusy((s) => new Set(s).add(barName));
     setOverride((o) => ({ ...o, [barName]: true }));
     try {
       await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note);
+      toast(`Checked in at ${barName} 🍺`, "success");
     } catch (e) {
       setOverride((o) => ({ ...o, [barName]: false }));
-      setError(e instanceof Error ? e.message : "Check-in failed.");
+      toast(e instanceof Error ? e.message : "Check-in failed.", "error");
       throw e;
     } finally {
       setBusy((s) => {
@@ -89,7 +90,6 @@ export function BarsTab({
     }
 
     // Checking OUT — immediate, no photo.
-    setError(null);
     setBusy((s) => new Set(s).add(barName));
     setOverride((o) => ({ ...o, [barName]: false }));
     try {
@@ -97,7 +97,7 @@ export function BarsTab({
       if (existing) await undoCheckIn(existing.id);
     } catch (e) {
       setOverride((o) => ({ ...o, [barName]: true }));
-      setError(e instanceof Error ? e.message : "Could not undo check-in.");
+      toast(e instanceof Error ? e.message : "Could not undo check-in.", "error");
     } finally {
       setBusy((s) => {
         const n = new Set(s);
@@ -111,12 +111,6 @@ export function BarsTab({
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
       <h2 className="font-display text-2xl font-extrabold">Bars</h2>
       <p className="-mt-1 text-sm opacity-60">Check in everywhere you drink. One in each zone to win.</p>
-
-      {error && (
-        <p className="rounded-xl bg-[var(--color-alert)]/10 px-4 py-2 text-sm font-semibold text-[var(--color-alert)]">
-          {error}
-        </p>
-      )}
 
       {ZONE_ORDER.map((zone) => {
         const zoneBars = BARS.filter((b) => b.zone === zone);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Message } from "../lib/types";
+import { useToast } from "./Toast";
 
 function timeOf(iso: string) {
   try {
@@ -21,9 +22,9 @@ export function ChatThread({
   onSend: (content: string) => Promise<void>;
   emptyHint?: string;
 }) {
+  const toast = useToast();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to newest.
@@ -36,12 +37,11 @@ export function ChatThread({
     const content = text.trim();
     if (!content || sending) return;
     setSending(true);
-    setError(null);
     try {
       await onSend(content);
       setText("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send.");
+      toast(err instanceof Error ? err.message : "Could not send.", "error");
     } finally {
       setSending(false);
     }
@@ -83,9 +83,6 @@ export function ChatThread({
           <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-black/20 border-t-[var(--color-gold)]" />
           Sending…
         </p>
-      )}
-      {error && (
-        <p className="px-4 pb-1 text-xs font-semibold text-[var(--color-alert)]">{error}</p>
       )}
 
       <form onSubmit={submit} className="safe-bottom flex items-center gap-2 border-t-2 border-black/10 p-3">

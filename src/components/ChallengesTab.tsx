@@ -10,6 +10,7 @@ import { pushChallenge, submitForApproval, updatePendingEvidence } from "../lib/
 import { playChime } from "../lib/sound";
 import type { ChallengeCompletion, PendingChallenge, PushedChallenge } from "../lib/types";
 import { MediaUpload } from "./MediaUpload";
+import { useToast } from "./Toast";
 
 const FILTERS: { id: "all" | Difficulty; label: string }[] = [
   { id: "all", label: "All" },
@@ -47,9 +48,8 @@ export function ChallengesTab({
   laterPushes: PushedChallenge[];
   onLaterActioned: (id: string) => void;
 }) {
+  const toast = useToast();
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-  const [pushedNote, setPushedNote] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | Difficulty>("all");
   // challenge id -> staged submission draft (before it's sent for approval)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -98,7 +98,6 @@ export function ChallengesTab({
   async function submit(ch: Challenge) {
     if (busy.has(ch.id)) return;
     const draft = getDraft(ch.id);
-    setError(null);
     setBusy((s) => new Set(s).add(ch.id));
     try {
       await submitForApproval(gameId, teamId, {
@@ -117,8 +116,9 @@ export function ChallengesTab({
         return n;
       });
       playChime();
+      toast("Submitted for the Chicken 🍗", "success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not submit challenge.");
+      toast(e instanceof Error ? e.message : "Could not submit challenge.", "error");
     } finally {
       setBusy((s) => {
         const n = new Set(s);
@@ -129,17 +129,15 @@ export function ChallengesTab({
   }
 
   async function challengeATeam(ch: Challenge) {
-    setError(null);
     try {
       await pushChallenge(
         gameId,
         `⚔️ ${teamName} challenges you: ${ch.name} — ${ch.description}`,
         ch.points,
       );
-      setPushedNote(`Sent "${ch.name}" to all teams!`);
-      setTimeout(() => setPushedNote(null), 2500);
+      toast(`Sent "${ch.name}" to all teams!`, "success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send challenge.");
+      toast(e instanceof Error ? e.message : "Could not send challenge.", "error");
     }
   }
 
@@ -162,17 +160,6 @@ export function ChallengesTab({
       <p className="-mt-1 text-sm opacity-60">
         Submit a challenge and the Chicken approves it before points land.
       </p>
-
-      {error && (
-        <p className="rounded-xl bg-[var(--color-alert)]/10 px-4 py-2 text-sm font-semibold text-[var(--color-alert)]">
-          {error}
-        </p>
-      )}
-      {pushedNote && (
-        <p className="animate-pop rounded-xl bg-green-600/15 px-4 py-2 text-sm font-semibold text-green-700">
-          {pushedNote}
-        </p>
-      )}
 
       {/* Waiting: pushed challenges the team tapped "Later" on */}
       {filter === "all" && laterPushes.length > 0 && (

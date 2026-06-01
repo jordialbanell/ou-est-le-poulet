@@ -17,6 +17,7 @@ import { isVideoUrl } from "../lib/cloudinary";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot, RefreshButton } from "./common";
 import { ChatThread } from "./ChatThread";
+import { useToast } from "./Toast";
 import type { ChallengeCompletion, Message, PendingChallenge, Team } from "../lib/types";
 
 const ADMIN_PASSWORD = "Poulet2026!";
@@ -155,12 +156,12 @@ function AdminPanelInner() {
 
 function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
   const state = useGame(gameId);
+  const toast = useToast();
   const [location, setLocation] = useState("");
   const [revealing, setRevealing] = useState(false);
   const [pushText, setPushText] = useState("");
   const [pushPoints, setPushPoints] = useState(2);
   const [pushing, setPushing] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 
   useEffect(() => {
@@ -176,7 +177,9 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
     setRevealing(true);
     try {
       await revealChicken(gameId, location.trim());
-      flash("Chicken location revealed to all teams! 🍗");
+      toast("Chicken location revealed to all teams! 🍗", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not reveal location.", "error");
     } finally {
       setRevealing(false);
     }
@@ -189,15 +192,12 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
     try {
       await pushChallenge(gameId, pushText.trim(), pushPoints);
       setPushText("");
-      flash("✅ Challenge pushed to all teams!");
+      toast("✅ Challenge pushed to all teams!", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not push challenge.", "error");
     } finally {
       setPushing(false);
     }
-  }
-
-  function flash(msg: string) {
-    setNote(msg);
-    setTimeout(() => setNote(null), 2500);
   }
 
   return (
@@ -213,18 +213,11 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         </div>
       </div>
 
-      {note && (
-        <p className="animate-pop rounded-xl bg-green-600/15 px-4 py-2 text-sm font-semibold text-green-700">
-          {note}
-        </p>
-      )}
-
       {/* Approval queue */}
       <ApprovalQueue
         gameId={gameId}
         pending={state.pendingChallenges}
         teams={state.teams}
-        onFlash={flash}
         onRefresh={state.refreshPending}
       />
 
@@ -242,7 +235,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
           <button
             onClick={() => {
               void navigator.clipboard?.writeText(joinUrl);
-              flash("Link copied!");
+              toast("Link copied!", "success");
             }}
             className="font-display rounded-xl bg-[var(--color-gold)] px-3 py-2 text-sm font-bold text-white"
           >
@@ -373,7 +366,6 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
                     teamId={row.team.id}
                     completions={state.completions}
                     pending={state.pendingChallenges}
-                    onFlash={flash}
                   />
                 )}
               </div>
@@ -389,17 +381,15 @@ function ApprovalQueue({
   gameId,
   pending,
   teams,
-  onFlash,
   onRefresh,
 }: {
   gameId: string;
   pending: PendingChallenge[];
   teams: Team[];
-  onFlash: (msg: string) => void;
   onRefresh: () => Promise<void>;
 }) {
+  const toast = useToast();
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
@@ -422,12 +412,11 @@ function ApprovalQueue({
 
   async function refresh() {
     setRefreshing(true);
-    setError(null);
     try {
       await onRefresh();
       setLastUpdated(Date.now());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Refresh failed.");
+      toast(e instanceof Error ? e.message : "Refresh failed.", "error");
     } finally {
       setRefreshing(false);
     }
@@ -448,19 +437,18 @@ function ApprovalQueue({
 
   async function approve(p: PendingChallenge) {
     if (busy.has(p.id)) return;
-    setError(null);
     setBusy((s) => new Set(s).add(p.id));
     setRemoved((r) => new Set(r).add(p.id)); // optimistic remove
     try {
       await approvePending(p);
-      onFlash(`Approved "${p.challenge_name}" for ${teamName(p.team_id)} (+${p.points})`);
+      toast(`Approved "${p.challenge_name}" (+${p.points})`, "success");
     } catch (e) {
       setRemoved((r) => {
         const n = new Set(r);
         n.delete(p.id);
         return n;
       });
-      setError(e instanceof Error ? e.message : "Action failed.");
+      toast(e instanceof Error ? e.message : "Action failed.", "error");
     } finally {
       setBusy((s) => {
         const n = new Set(s);
@@ -473,7 +461,6 @@ function ApprovalQueue({
   async function confirmReject(p: PendingChallenge) {
     if (busy.has(p.id)) return;
     const why = reason.trim();
-    setError(null);
     setBusy((s) => new Set(s).add(p.id));
     setRemoved((r) => new Set(r).add(p.id)); // optimistic remove
     setRejectingId(null);
@@ -488,14 +475,14 @@ function ApprovalQueue({
         `❌ "${p.challenge_name}" rejected${why ? `: ${why}` : "."}`,
         true,
       );
-      onFlash(`Rejected "${p.challenge_name}" for ${teamName(p.team_id)}`);
+      toast(`Rejected "${p.challenge_name}"`, "success");
     } catch (e) {
       setRemoved((r) => {
         const n = new Set(r);
         n.delete(p.id);
         return n;
       });
-      setError(e instanceof Error ? e.message : "Action failed.");
+      toast(e instanceof Error ? e.message : "Action failed.", "error");
     } finally {
       setBusy((s) => {
         const n = new Set(s);
@@ -526,10 +513,6 @@ function ApprovalQueue({
         </button>
         <span className="ml-auto text-xs font-semibold opacity-50">Updated {agoLabel}</span>
       </div>
-
-      {error && (
-        <p className="mb-2 text-sm font-semibold text-[var(--color-alert)]">{error}</p>
-      )}
 
       {queue.length === 0 ? (
         <p className="text-sm opacity-60">No submissions waiting. 🍗</p>
@@ -769,19 +752,20 @@ function TeamPoints({
   teamId,
   completions,
   pending,
-  onFlash,
 }: {
   teamId: string;
   completions: ChallengeCompletion[];
   pending: PendingChallenge[];
-  onFlash: (msg: string) => void;
 }) {
+  const toast = useToast();
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [editVal, setEditVal] = useState(0);
+  // Optimistically hide rows we've removed, before Realtime catches up.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
 
   const approved = completions
-    .filter((c) => c.team_id === teamId)
+    .filter((c) => c.team_id === teamId && !removed.has(c.id))
     .sort((a, b) => a.completed_at.localeCompare(b.completed_at));
   const rejected = pending
     .filter((p) => p.team_id === teamId && p.status === "rejected")
@@ -791,7 +775,7 @@ function TeamPoints({
     if (busy.has(id)) return;
     setBusy((s) => new Set(s).add(id));
     fn()
-      .catch((e) => onFlash(e instanceof Error ? e.message : "Action failed."))
+      .catch((e) => toast(e instanceof Error ? e.message : "Action failed.", "error"))
       .finally(() =>
         setBusy((s) => {
           const n = new Set(s);
@@ -802,13 +786,23 @@ function TeamPoints({
   }
 
   async function remove(c: ChallengeCompletion) {
-    await removeCompletion(c.id);
-    onFlash(`Removed "${c.challenge_name}" (−${c.points})`);
+    setRemoved((r) => new Set(r).add(c.id)); // optimistic: gone from UI now
+    try {
+      await removeCompletion(c.id);
+      toast(`Removed "${c.challenge_name}" (−${c.points})`, "success");
+    } catch (e) {
+      setRemoved((r) => {
+        const n = new Set(r);
+        n.delete(c.id);
+        return n;
+      });
+      toast(e instanceof Error ? e.message : "Could not remove.", "error");
+    }
   }
   async function saveEdit(c: ChallengeCompletion) {
     await updateCompletionPoints(c.id, editVal);
     setEditing(null);
-    onFlash(`Updated "${c.challenge_name}" to ${editVal} pts`);
+    toast(`Updated "${c.challenge_name}" to ${editVal} pts`, "success");
   }
 
   return (
