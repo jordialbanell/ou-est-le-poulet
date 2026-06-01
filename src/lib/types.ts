@@ -44,6 +44,8 @@ export interface BarCheckin {
   bar_name: string;
   zone: Zone;
   checked_in_at: string;
+  checkin_evidence_url: string | null;
+  checkin_note: string | null;
 }
 
 export interface ChallengeCompletion {

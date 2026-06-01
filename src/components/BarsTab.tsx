@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { BARS, ZONE_ORDER, ZONES, type Zone } from "../lib/data";
 import { checkInBar, undoCheckIn } from "../lib/actions";
 import type { BarCheckin } from "../lib/types";
+import { CheckInModal } from "./CheckInModal";
+
+const PHOTO_REQUIRED_BARS = 6;
 
 const mapsUrl = (barName: string) =>
   `https://www.google.com/maps/search/${encodeURIComponent(`${barName} Singapore`)}`;
@@ -20,6 +23,8 @@ export function BarsTab({
   const [error, setError] = useState<string | null>(null);
   // Optimistic overrides: bar name -> desired checked state while a write is in flight.
   const [override, setOverride] = useState<Record<string, boolean>>({});
+  // Bar awaiting a drink photo before its check-in completes.
+  const [photoFor, setPhotoFor] = useState<{ name: string; zone: Zone } | null>(null);
 
   // bar name -> this team's checkin row (if any)
   const myCheckins = useMemo(() => {
@@ -30,6 +35,9 @@ export function BarsTab({
 
   // Effective checked state = optimistic override if present, else server truth.
   const isChecked = (barName: string) => override[barName] ?? myCheckins.has(barName);
+
+  // How many bars this team has checked into so far (effective, optimistic-aware).
+  const checkedCount = BARS.filter((b) => isChecked(b.name)).length;
 
   // Once the server (via realtime) agrees with an override, drop the override.
   useEffect(() => {
@@ -46,25 +54,50 @@ export function BarsTab({
     });
   }, [myCheckins]);
 
+  /** Optimistically check in (with optional drink evidence) and persist. */
+  async function doCheckIn(barName: string, zone: Zone, evidenceUrl?: string, note?: string) {
+    setError(null);
+    setBusy((s) => new Set(s).add(barName));
+    setOverride((o) => ({ ...o, [barName]: true }));
+    try {
+      await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note);
+    } catch (e) {
+      setOverride((o) => ({ ...o, [barName]: false }));
+      setError(e instanceof Error ? e.message : "Check-in failed.");
+      throw e;
+    } finally {
+      setBusy((s) => {
+        const n = new Set(s);
+        n.delete(barName);
+        return n;
+      });
+    }
+  }
+
   async function toggle(barName: string, zone: Zone) {
     if (busy.has(barName)) return;
     const current = isChecked(barName);
-    const want = !current;
+
+    if (!current) {
+      // Checking IN — first 6 bars require a drink photo.
+      if (checkedCount < PHOTO_REQUIRED_BARS) {
+        setPhotoFor({ name: barName, zone });
+        return;
+      }
+      await doCheckIn(barName, zone).catch(() => {});
+      return;
+    }
+
+    // Checking OUT — immediate, no photo.
     setError(null);
     setBusy((s) => new Set(s).add(barName));
-    setOverride((o) => ({ ...o, [barName]: want })); // optimistic flip
+    setOverride((o) => ({ ...o, [barName]: false }));
     try {
-      if (want) {
-        await checkInBar(gameId, teamId, barName, zone);
-      } else {
-        const existing = myCheckins.get(barName);
-        if (existing) await undoCheckIn(existing.id);
-      }
-      // Leave the override in place; the reconcile effect clears it once
-      // realtime confirms. If realtime is slow, the optimistic state holds.
+      const existing = myCheckins.get(barName);
+      if (existing) await undoCheckIn(existing.id);
     } catch (e) {
-      setOverride((o) => ({ ...o, [barName]: current })); // revert on failure
-      setError(e instanceof Error ? e.message : "Check-in failed.");
+      setOverride((o) => ({ ...o, [barName]: true }));
+      setError(e instanceof Error ? e.message : "Could not undo check-in.");
     } finally {
       setBusy((s) => {
         const n = new Set(s);
@@ -179,6 +212,18 @@ export function BarsTab({
           </div>
         );
       })}
+
+      {photoFor && (
+        <CheckInModal
+          barName={photoFor.name}
+          barNumber={checkedCount + 1}
+          onCancel={() => setPhotoFor(null)}
+          onConfirm={async (evidenceUrl, note) => {
+            await doCheckIn(photoFor.name, photoFor.zone, evidenceUrl, note);
+            setPhotoFor(null);
+          }}
+        />
+      )}
     </div>
   );
 }

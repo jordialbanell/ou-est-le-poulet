@@ -31,6 +31,10 @@ create table if not exists bar_checkins (
   checked_in_at timestamptz default now()
 );
 
+-- First 6 bars require a drink photo (added later).
+alter table bar_checkins add column if not exists checkin_evidence_url text;
+alter table bar_checkins add column if not exists checkin_note text;
+
 -- Challenge completions
 create table if not exists challenge_completions (
   id uuid default gen_random_uuid() primary key,

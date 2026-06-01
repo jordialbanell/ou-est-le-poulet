@@ -314,28 +314,43 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
       <Card title="Team Progress">
         {rows.length === 0 && <p className="text-sm opacity-60">No teams yet.</p>}
         <div className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <div
-              key={row.team.id}
-              className="flex items-center gap-3 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] p-3"
-            >
-              <span className="font-display w-6 text-center font-extrabold">{row.rank}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: row.team.color }} />
-                  <p className="font-display truncate font-bold">{row.team.name}</p>
-                  {row.canSitDown && <span title="Can sit down">🍗</span>}
+          {rows.map((row) => {
+            const drinkPhotos = state.checkins
+              .filter((c) => c.team_id === row.team.id && c.checkin_evidence_url)
+              .sort((a, b) => a.checked_in_at.localeCompare(b.checked_in_at));
+            return (
+              <div
+                key={row.team.id}
+                className="rounded-xl border-2 border-black/10 bg-[var(--color-paper)] p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-display w-6 text-center font-extrabold">{row.rank}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: row.team.color }} />
+                      <p className="font-display truncate font-bold">{row.team.name}</p>
+                      {row.canSitDown && <span title="Can sit down">🍗</span>}
+                    </div>
+                    <div className="mt-1.5">
+                      <ZonePills visited={row.zonesVisited} size="sm" />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-display text-2xl font-extrabold leading-none">{row.totalPoints}</p>
+                    <p className="text-[11px] font-bold opacity-50">{row.barCount} bars</p>
+                  </div>
                 </div>
-                <div className="mt-1.5">
-                  <ZonePills visited={row.zonesVisited} size="sm" />
-                </div>
+
+                {drinkPhotos.length > 0 && (
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {drinkPhotos.map((c) => (
+                      <DrinkThumb key={c.id} url={c.checkin_evidence_url as string} barName={c.bar_name} />
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="text-right">
-                <p className="font-display text-2xl font-extrabold leading-none">{row.totalPoints}</p>
-                <p className="text-[11px] font-bold opacity-50">{row.barCount} bars</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
     </div>
@@ -643,6 +658,24 @@ function AdminMessages({
         </div>
       )}
     </section>
+  );
+}
+
+function DrinkThumb({ url, barName }: { url: string; barName: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={barName}
+      className="shrink-0"
+    >
+      {isVideoUrl(url) ? (
+        <video src={url} muted playsInline className="h-14 w-14 rounded-lg border-2 border-black/10 object-cover" />
+      ) : (
+        <img src={url} alt={barName} className="h-14 w-14 rounded-lg border-2 border-black/10 object-cover" />
+      )}
+    </a>
   );
 }
 

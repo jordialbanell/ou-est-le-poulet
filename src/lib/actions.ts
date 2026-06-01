@@ -85,10 +85,19 @@ export async function checkInBar(
   teamId: string,
   barName: string,
   zone: Zone,
+  evidenceUrl?: string | null,
+  note?: string | null,
 ) {
   const { data, error } = await supabase
     .from("bar_checkins")
-    .insert({ game_id: gameId, team_id: teamId, bar_name: barName, zone })
+    .insert({
+      game_id: gameId,
+      team_id: teamId,
+      bar_name: barName,
+      zone,
+      checkin_evidence_url: evidenceUrl || null,
+      checkin_note: note?.trim() || null,
+    })
     .select()
     .single();
   if (error) {
