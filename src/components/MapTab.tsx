@@ -1,40 +1,32 @@
-import { useMemo } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
-import * as L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { BARS, SINGAPORE_CENTER, ZONES, barPosition, type Zone } from "../lib/data";
+import { useEffect, useMemo, useState } from "react";
+import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
+import { BARS, ZONES, barPosition, type Bar, type Zone } from "../lib/data";
 import type { Team, TeamLocation } from "../lib/types";
 import type { GeoStatus } from "../hooks/useGeoTracking";
+
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const MAP_CENTER = { lat: 1.288, lng: 103.847 };
 
 const mapsUrl = (barName: string) =>
   `https://www.google.com/maps/search/${encodeURIComponent(`${barName} Singapore`)}`;
 
-function barIcon(zone: Zone) {
-  return L.divIcon({
-    className: "",
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:${ZONES[zone].color};color:#fff;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.4);border:2px solid #fff">🍺</div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-  });
-}
+const circleIcon = (color: string, size = 24) =>
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="${color}" stroke="white" stroke-width="3"/></svg>`,
+  );
 
-function teamIcon(team: Team, isMe: boolean) {
-  const initial = team.name.trim().charAt(0).toUpperCase() || "?";
-  return L.divIcon({
-    className: "",
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:${team.color};color:#fff;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.5);border:3px solid ${isMe ? "#fff" : "rgba(255,255,255,.6)"}">${initial}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-  });
+/** Pans the map when a target position is set (e.g. after "Find Me"). */
+function Recenter({ pos }: { pos: google.maps.LatLngLiteral | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (map && pos) {
+      map.panTo(pos);
+      map.setZoom(17);
+    }
+  }, [map, pos]);
+  return null;
 }
-
-const GEO_LABEL: Record<GeoStatus, string> = {
-  idle: "Starting GPS…",
-  tracking: "📍 Sharing your location",
-  denied: "Location blocked — enable GPS to appear on the map",
-  unavailable: "GPS not available on this device",
-  error: "Couldn't read your location",
-};
 
 export function MapTab({
   teams,
@@ -47,12 +39,17 @@ export function MapTab({
   currentTeamId: string;
   geoStatus: GeoStatus;
 }) {
-  // Pre-compute a stable position for every bar.
+  const [selected, setSelected] = useState<{ bar: Bar; pos: google.maps.LatLngLiteral } | null>(null);
+  const [userPos, setUserPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const [findError, setFindError] = useState<string | null>(null);
+  const [finding, setFinding] = useState(false);
+
   const barPins = useMemo(() => {
     const perZone: Record<Zone, number> = { A: 0, B: 0, C: 0 };
     return BARS.map((bar) => {
       const idx = perZone[bar.zone]++;
-      return { bar, pos: barPosition(bar.zone, idx) };
+      const p = barPosition(bar.zone, idx);
+      return { bar, pos: { lat: p.lat, lng: p.lng } };
     });
   }, []);
 
@@ -62,7 +59,6 @@ export function MapTab({
     return m;
   }, [teams]);
 
-  // Latest location per team.
   const latestByTeam = useMemo(() => {
     const m = new Map<string, TeamLocation>();
     for (const loc of teamLocations) {
@@ -72,67 +68,126 @@ export function MapTab({
     return m;
   }, [teamLocations]);
 
+  function findMe() {
+    if (!navigator.geolocation) {
+      setFindError("GPS not available on this device.");
+      return;
+    }
+    setFinding(true);
+    setFindError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setFinding(false);
+      },
+      (err) => {
+        setFindError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location blocked — enable GPS for this site."
+            : "Couldn't get your location.",
+        );
+        setFinding(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
+  if (!API_KEY) {
+    return (
+      <div className="px-4 pt-10 text-center">
+        <p className="font-display text-lg font-bold">Map unavailable</p>
+        <p className="text-sm opacity-60">VITE_GOOGLE_MAPS_API_KEY is missing from .env.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
-      <h2 className="font-display text-2xl font-extrabold">Map</h2>
-      <p
-        className={`-mt-1 text-sm font-semibold ${
-          geoStatus === "denied" || geoStatus === "error" ? "text-[var(--color-alert)]" : "opacity-60"
-        }`}
-      >
-        {GEO_LABEL[geoStatus]}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display text-2xl font-extrabold">Map</h2>
+        <button
+          onClick={findMe}
+          disabled={finding}
+          className="font-display rounded-xl bg-[var(--color-gold)] px-4 py-2 text-sm font-bold uppercase tracking-wide text-white transition active:scale-95 disabled:opacity-60"
+        >
+          {finding ? "Locating…" : "📍 Find Me"}
+        </button>
+      </div>
+      {findError && <p className="-mt-1 text-sm font-semibold text-[var(--color-alert)]">{findError}</p>}
+      {geoStatus === "denied" && !findError && (
+        <p className="-mt-1 text-sm font-semibold text-[var(--color-alert)]">
+          Location blocked — enable GPS to share your spot.
+        </p>
+      )}
 
       <div className="overflow-hidden rounded-2xl border-2 border-black/10" style={{ height: "calc(100dvh - 16rem)" }}>
-        <MapContainer
-          center={[SINGAPORE_CENTER.lat, SINGAPORE_CENTER.lng]}
-          zoom={16}
-          scrollWheelZoom
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          {barPins.map(({ bar, pos }) => (
-            <Marker key={bar.name} position={[pos.lat, pos.lng]} icon={barIcon(bar.zone)}>
-              <Popup>
-                <strong>{bar.name}</strong>
-                <br />
-                {ZONES[bar.zone].label}
-                <br />
-                <a
-                  href={mapsUrl(bar.name)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#1565C0", fontWeight: 600 }}
-                >
-                  Open in Google Maps →
-                </a>
-              </Popup>
-            </Marker>
-          ))}
-
-          {[...latestByTeam.values()].map((loc) => {
-            const team = teamById.get(loc.team_id);
-            if (!team) return null;
-            const isMe = team.id === currentTeamId;
-            return (
+        <APIProvider apiKey={API_KEY}>
+          <GoogleMap
+            defaultCenter={MAP_CENTER}
+            defaultZoom={16}
+            gestureHandling="greedy"
+            disableDefaultUI={false}
+            clickableIcons={false}
+            style={{ width: "100%", height: "100%" }}
+          >
+            {/* Bar markers, colour-coded by zone */}
+            {barPins.map(({ bar, pos }) => (
               <Marker
-                key={loc.team_id}
-                position={[loc.lat, loc.lng]}
-                icon={teamIcon(team, isMe)}
-                zIndexOffset={1000}
-              >
-                <Popup>
-                  <strong>{team.name}</strong>
-                  {isMe ? " (you)" : ""}
-                </Popup>
-              </Marker>
-            );
-          })}
-        </MapContainer>
+                key={bar.name}
+                position={pos}
+                icon={circleIcon(ZONES[bar.zone].color)}
+                title={bar.name}
+                onClick={() => setSelected({ bar, pos })}
+              />
+            ))}
+
+            {/* Team live locations */}
+            {[...latestByTeam.values()].map((loc) => {
+              const team = teamById.get(loc.team_id);
+              if (!team) return null;
+              const isMe = team.id === currentTeamId;
+              return (
+                <Marker
+                  key={loc.team_id}
+                  position={{ lat: loc.lat, lng: loc.lng }}
+                  icon={circleIcon(team.color, 34)}
+                  zIndex={1000}
+                  label={{
+                    text: team.name + (isMe ? " (you)" : ""),
+                    className: "oelp-team-label",
+                    color: "#1a1a1a",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                  }}
+                />
+              );
+            })}
+
+            {/* "Find Me" pin */}
+            {userPos && <Marker position={userPos} icon={circleIcon("#1A73E8", 30)} title="You" />}
+
+            {selected && (
+              <InfoWindow position={selected.pos} onCloseClick={() => setSelected(null)}>
+                <div style={{ minWidth: 140 }}>
+                  <strong>{selected.bar.name}</strong>
+                  <br />
+                  {ZONES[selected.bar.zone].label}
+                  <br />
+                  <a
+                    href={mapsUrl(selected.bar.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#1565C0", fontWeight: 600 }}
+                  >
+                    Open in Google Maps →
+                  </a>
+                </div>
+              </InfoWindow>
+            )}
+
+            <Recenter pos={userPos} />
+          </GoogleMap>
+        </APIProvider>
       </div>
 
       {/* Legend */}

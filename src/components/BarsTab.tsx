@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BARS, ZONE_ORDER, ZONES, type Zone } from "../lib/data";
 import { checkInBar, undoCheckIn } from "../lib/actions";
 import type { BarCheckin } from "../lib/types";
@@ -18,6 +18,8 @@ export function BarsTab({
   const [openZones, setOpenZones] = useState<Set<Zone>>(new Set<Zone>(["A"]));
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  // Optimistic overrides: bar name -> desired checked state while a write is in flight.
+  const [override, setOverride] = useState<Record<string, boolean>>({});
 
   // bar name -> this team's checkin row (if any)
   const myCheckins = useMemo(() => {
@@ -26,15 +28,42 @@ export function BarsTab({
     return map;
   }, [checkins, teamId]);
 
+  // Effective checked state = optimistic override if present, else server truth.
+  const isChecked = (barName: string) => override[barName] ?? myCheckins.has(barName);
+
+  // Once the server (via realtime) agrees with an override, drop the override.
+  useEffect(() => {
+    setOverride((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [name, want] of Object.entries(prev)) {
+        if (myCheckins.has(name) === want) {
+          delete next[name];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [myCheckins]);
+
   async function toggle(barName: string, zone: Zone) {
     if (busy.has(barName)) return;
+    const current = isChecked(barName);
+    const want = !current;
     setError(null);
     setBusy((s) => new Set(s).add(barName));
+    setOverride((o) => ({ ...o, [barName]: want })); // optimistic flip
     try {
-      const existing = myCheckins.get(barName);
-      if (existing) await undoCheckIn(existing.id);
-      else await checkInBar(gameId, teamId, barName, zone);
+      if (want) {
+        await checkInBar(gameId, teamId, barName, zone);
+      } else {
+        const existing = myCheckins.get(barName);
+        if (existing) await undoCheckIn(existing.id);
+      }
+      // Leave the override in place; the reconcile effect clears it once
+      // realtime confirms. If realtime is slow, the optimistic state holds.
     } catch (e) {
+      setOverride((o) => ({ ...o, [barName]: current })); // revert on failure
       setError(e instanceof Error ? e.message : "Check-in failed.");
     } finally {
       setBusy((s) => {
@@ -58,12 +87,12 @@ export function BarsTab({
 
       {ZONE_ORDER.map((zone) => {
         const zoneBars = BARS.filter((b) => b.zone === zone);
-        const visitedCount = zoneBars.filter((b) => myCheckins.has(b.name)).length;
+        const visitedCount = zoneBars.filter((b) => isChecked(b.name)).length;
         const open = openZones.has(zone);
         // Visited bars sink to the bottom.
         const sorted = [...zoneBars].sort((a, b) => {
-          const av = myCheckins.has(a.name) ? 1 : 0;
-          const bv = myCheckins.has(b.name) ? 1 : 0;
+          const av = isChecked(a.name) ? 1 : 0;
+          const bv = isChecked(b.name) ? 1 : 0;
           return av - bv;
         });
 
@@ -108,7 +137,7 @@ export function BarsTab({
             {open && (
               <ul className="border-t border-black/10">
                 {sorted.map((bar) => {
-                  const checked = myCheckins.has(bar.name);
+                  const checked = isChecked(bar.name);
                   const isBusy = busy.has(bar.name);
                   return (
                     <li key={bar.name} className="flex items-stretch border-b border-black/5">

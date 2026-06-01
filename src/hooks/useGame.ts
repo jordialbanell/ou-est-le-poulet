@@ -4,6 +4,7 @@ import type {
   BarCheckin,
   ChallengeCompletion,
   Game,
+  Message,
   PendingChallenge,
   PushedChallenge,
   Team,
@@ -18,6 +19,7 @@ export interface GameState {
   pushedChallenges: PushedChallenge[];
   pendingChallenges: PendingChallenge[];
   teamLocations: TeamLocation[];
+  messages: Message[];
   loading: boolean;
   error: string | null;
   connected: boolean;
@@ -41,6 +43,7 @@ export function useGame(gameId: string | null): GameState {
   const [pushedChallenges, setPushedChallenges] = useState<PushedChallenge[]>([]);
   const [pendingChallenges, setPendingChallenges] = useState<PendingChallenge[]>([]);
   const [teamLocations, setTeamLocations] = useState<TeamLocation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -82,15 +85,31 @@ export function useGame(gameId: string | null): GameState {
 
   const fetchPushed = useCallback(async () => {
     if (!gameId) return;
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from("pushed_challenges")
       .select()
       .eq("game_id", gameId)
       .order("pushed_at", { ascending: false });
-    if (data) {
-      setPushedChallenges(data);
-      // Record existing ones so they don't fire a toast on first load.
-      if (!initialized.current) data.forEach((p) => seenPushIds.current.add(p.id));
+    if (err) {
+      console.error("[OELP] fetch pushed_challenges failed", err);
+      return;
+    }
+    if (!data) return;
+    setPushedChallenges(data);
+
+    if (!initialized.current) {
+      // First load — mark everything seen so old pushes don't toast.
+      data.forEach((p) => seenPushIds.current.add(p.id));
+      return;
+    }
+    // Fire the toast for the newest unseen push (covers both realtime + poll).
+    const unseen = data.filter((p) => !seenPushIds.current.has(p.id));
+    if (unseen.length > 0) {
+      // data is newest-first, so unseen[0] is the most recent.
+      const newest = unseen[0];
+      unseen.forEach((p) => seenPushIds.current.add(p.id));
+      console.debug("[OELP] new pushed challenge", newest.id, newest.challenge_text);
+      setNewPush(newest);
     }
   }, [gameId]);
 
@@ -113,6 +132,16 @@ export function useGame(gameId: string | null): GameState {
     if (data) setTeamLocations(data);
   }, [gameId]);
 
+  const fetchMessages = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from("messages")
+      .select()
+      .eq("game_id", gameId)
+      .order("sent_at", { ascending: true });
+    if (data) setMessages(data);
+  }, [gameId]);
+
   const refresh = useCallback(async () => {
     if (!gameId) return;
     setError(null);
@@ -125,6 +154,7 @@ export function useGame(gameId: string | null): GameState {
         fetchPushed(),
         fetchPending(),
         fetchLocations(),
+        fetchMessages(),
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load game data.");
@@ -138,6 +168,7 @@ export function useGame(gameId: string | null): GameState {
     fetchPushed,
     fetchPending,
     fetchLocations,
+    fetchMessages,
   ]);
 
   // Initial load.
@@ -204,11 +235,8 @@ export function useGame(gameId: string | null): GameState {
           filter: `game_id=eq.${gameId}`,
         },
         (payload) => {
-          const row = payload.new as PushedChallenge;
-          if (!seenPushIds.current.has(row.id)) {
-            seenPushIds.current.add(row.id);
-            setNewPush(row);
-          }
+          console.debug("[OELP] realtime: pushed_challenges INSERT", payload.new);
+          // fetchPushed() handles seen-tracking + firing the toast.
           void fetchPushed();
         },
       )
@@ -234,14 +262,33 @@ export function useGame(gameId: string | null): GameState {
       )
       .on(
         "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => void fetchMessages(),
+      )
+      .on(
+        "postgres_changes",
         { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
         (payload) => setGame(payload.new as Game),
       )
       .subscribe((status) => {
+        console.debug("[OELP] realtime channel status:", status);
         setConnected(status === "SUBSCRIBED");
       });
 
+    // Fallback poll so pushed challenges + messages still arrive if the
+    // realtime socket drops or the table isn't in the publication.
+    const poll = setInterval(() => {
+      void fetchPushed();
+      void fetchMessages();
+    }, 12_000);
+
     return () => {
+      clearInterval(poll);
       void supabase.removeChannel(channel);
     };
   }, [
@@ -252,6 +299,7 @@ export function useGame(gameId: string | null): GameState {
     fetchPushed,
     fetchPending,
     fetchLocations,
+    fetchMessages,
   ]);
 
   const dismissPush = useCallback(() => setNewPush(null), []);
@@ -264,6 +312,7 @@ export function useGame(gameId: string | null): GameState {
     pushedChallenges,
     pendingChallenges,
     teamLocations,
+    messages,
     loading,
     error,
     connected,

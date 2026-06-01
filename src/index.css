@@ -113,6 +113,16 @@ h3,
   font-family: var(--font-display);
 }
 
+/* Team name labels on the Google map — give them a readable chip background */
+.oelp-team-label {
+  background: rgba(255, 255, 255, 0.92);
+  padding: 1px 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  transform: translateY(26px);
+}
+
 /* Respect notches / home indicator on phones */
 .safe-top {
   padding-top: env(safe-area-inset-top);

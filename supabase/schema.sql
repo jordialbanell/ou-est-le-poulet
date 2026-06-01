@@ -152,3 +152,25 @@ drop policy if exists "Public update" on team_locations;
 create policy "Public read"   on team_locations for select using (true);
 create policy "Public insert" on team_locations for insert with check (true);
 create policy "Public update" on team_locations for update using (true);
+
+-- ============================================================
+--  Team ↔ Chicken chat
+-- ============================================================
+
+create table if not exists messages (
+  id uuid default gen_random_uuid() primary key,
+  game_id uuid references games(id) on delete cascade,
+  team_id uuid references teams(id) on delete cascade,
+  sender text not null,
+  content text not null,
+  is_chicken boolean not null default false,
+  sent_at timestamptz default now()
+);
+
+alter publication supabase_realtime add table messages;
+
+alter table messages enable row level security;
+drop policy if exists "Public read" on messages;
+drop policy if exists "Public insert" on messages;
+create policy "Public read"   on messages for select using (true);
+create policy "Public insert" on messages for insert with check (true);

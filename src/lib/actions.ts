@@ -86,18 +86,26 @@ export async function checkInBar(
   barName: string,
   zone: Zone,
 ) {
-  const { error } = await supabase.from("bar_checkins").insert({
-    game_id: gameId,
-    team_id: teamId,
-    bar_name: barName,
-    zone,
-  });
-  if (error) throw error;
+  const { data, error } = await supabase
+    .from("bar_checkins")
+    .insert({ game_id: gameId, team_id: teamId, bar_name: barName, zone })
+    .select()
+    .single();
+  if (error) {
+    console.error("[OELP] check-in insert failed", { barName, zone, error });
+    throw new Error(error.message || "Check-in failed.");
+  }
+  console.debug("[OELP] checked in", barName, data?.id);
+  return data;
 }
 
 export async function undoCheckIn(checkinId: string) {
   const { error } = await supabase.from("bar_checkins").delete().eq("id", checkinId);
-  if (error) throw error;
+  if (error) {
+    console.error("[OELP] undo check-in failed", { checkinId, error });
+    throw new Error(error.message || "Could not undo check-in.");
+  }
+  console.debug("[OELP] undid check-in", checkinId);
 }
 
 export async function completeChallenge(
@@ -194,6 +202,26 @@ export async function pushChallenge(
     points,
   });
   if (error) throw error;
+}
+
+export async function sendMessage(
+  gameId: string,
+  teamId: string,
+  sender: string,
+  content: string,
+  isChicken: boolean,
+) {
+  const { error } = await supabase.from("messages").insert({
+    game_id: gameId,
+    team_id: teamId,
+    sender,
+    content: content.trim(),
+    is_chicken: isChicken,
+  });
+  if (error) {
+    console.error("[OELP] send message failed", error);
+    throw new Error(error.message || "Could not send message.");
+  }
 }
 
 export async function revealChicken(gameId: string, location: string) {

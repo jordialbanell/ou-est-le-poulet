@@ -12,6 +12,7 @@ import { LeaderboardTab } from "./LeaderboardTab";
 import { MapTab } from "./MapTab";
 import { WinBanner } from "./WinBanner";
 import { PushedChallengeToast } from "./PushedChallengeToast";
+import { ChatModal } from "./ChatModal";
 import { LiveDot, Spinner } from "./common";
 
 type Tab = "home" | "bars" | "challenges" | "leaderboard" | "map";
@@ -30,7 +31,13 @@ export function PlayShell() {
   const { dark, toggle } = useDarkMode();
   const [tab, setTab] = useState<Tab>("home");
   const [showWin, setShowWin] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const wasWinning = useRef(false);
+
+  const chatReadKey = `oelp.chatRead.${team?.teamId ?? ""}`;
+  const [chatLastRead, setChatLastRead] = useState(
+    () => localStorage.getItem(`oelp.chatRead.${team?.teamId ?? ""}`) ?? "",
+  );
 
   const state = useGame(team?.gameId ?? null);
 
@@ -54,6 +61,22 @@ export function PlayShell() {
   const status = team
     ? computeWinStatus(team.teamId, state.checkins, state.completions)
     : null;
+
+  // Unread = messages from the Chicken to this team since we last opened chat.
+  const unreadChat = useMemo(
+    () =>
+      state.messages.filter(
+        (m) => m.team_id === team?.teamId && m.is_chicken && m.sent_at > chatLastRead,
+      ).length,
+    [state.messages, team?.teamId, chatLastRead],
+  );
+
+  function openChat() {
+    const stamp = new Date().toISOString();
+    localStorage.setItem(chatReadKey, stamp);
+    setChatLastRead(stamp);
+    setChatOpen(true);
+  }
 
   // Fire the win banner when the team crosses into "can sit down".
   useEffect(() => {
@@ -107,6 +130,18 @@ export function PlayShell() {
         </div>
         <div className="flex items-center gap-3">
           <LiveDot connected={state.connected} />
+          <button
+            onClick={openChat}
+            aria-label="Chat with the Chicken"
+            className="relative rounded-full border border-black/15 px-2 py-1 text-sm"
+          >
+            💬
+            {unreadChat > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-alert)] px-1 text-[11px] font-extrabold text-white">
+                {unreadChat}
+              </span>
+            )}
+          </button>
           <button
             onClick={toggle}
             aria-label="Toggle dark mode"
@@ -194,6 +229,17 @@ export function PlayShell() {
 
       {/* Win celebration */}
       {showWin && <WinBanner onClose={() => setShowWin(false)} />}
+
+      {/* Team ↔ Chicken chat */}
+      {chatOpen && (
+        <ChatModal
+          gameId={team.gameId}
+          teamId={team.teamId}
+          teamName={teamName}
+          messages={state.messages}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

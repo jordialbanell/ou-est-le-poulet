@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useGame } from "../hooks/useGame";
 import {
@@ -8,12 +8,14 @@ import {
   pushChallenge,
   rejectPending,
   revealChicken,
+  sendMessage,
 } from "../lib/actions";
 import { supabaseConfigured } from "../lib/supabase";
 import { isVideoUrl } from "../lib/cloudinary";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot } from "./common";
-import type { PendingChallenge, Team } from "../lib/types";
+import { ChatThread } from "./ChatThread";
+import type { Message, PendingChallenge, Team } from "../lib/types";
 
 const ADMIN_PASSWORD = "Poulet2026!";
 const ADMIN_SESSION_KEY = "oelp.admin";
@@ -218,6 +220,9 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         onFlash={flash}
         onRefresh={state.refreshPending}
       />
+
+      {/* Team messages */}
+      <AdminMessages gameId={gameId} teams={state.teams} messages={state.messages} />
 
       {/* Share link */}
       <Card title="Join Link">
@@ -508,6 +513,133 @@ function ApprovalQueue({
               </div>
             );
           })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AdminMessages({
+  gameId,
+  teams,
+  messages,
+}: {
+  gameId: string;
+  teams: Team[];
+  messages: Message[];
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [reads, setReads] = useState<Record<string, string>>({});
+
+  // Seed last-read timestamps from localStorage for each team.
+  useEffect(() => {
+    setReads((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const t of teams) {
+        if (!(t.id in next)) {
+          next[t.id] = localStorage.getItem(`oelp.adminChatRead.${t.id}`) ?? "";
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [teams]);
+
+  const unreadFor = (teamId: string) =>
+    messages.filter(
+      (m) => m.team_id === teamId && !m.is_chicken && m.sent_at > (reads[teamId] ?? ""),
+    ).length;
+
+  const lastAt = (teamId: string) => {
+    const ms = messages.filter((m) => m.team_id === teamId);
+    return ms.length ? ms[ms.length - 1].sent_at : "";
+  };
+
+  // Teams with messages or unread first, then by most recent activity.
+  const ordered = useMemo(
+    () =>
+      [...teams].sort((a, b) => {
+        const ua = unreadFor(a.id);
+        const ub = unreadFor(b.id);
+        if (ua !== ub) return ub - ua;
+        return lastAt(b.id).localeCompare(lastAt(a.id));
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [teams, messages, reads],
+  );
+
+  function openThread(teamId: string) {
+    const stamp = new Date().toISOString();
+    localStorage.setItem(`oelp.adminChatRead.${teamId}`, stamp);
+    setReads((r) => ({ ...r, [teamId]: stamp }));
+    setSelected(teamId);
+  }
+
+  const selectedTeam = teams.find((t) => t.id === selected);
+  const thread = selected
+    ? messages
+        .filter((m) => m.team_id === selected)
+        .sort((a, b) => a.sent_at.localeCompare(b.sent_at))
+    : [];
+
+  return (
+    <section className="rounded-2xl border-2 border-black/10 bg-white/50 p-4">
+      <h2 className="font-display mb-3 text-sm font-bold uppercase tracking-widest opacity-60">
+        Messages
+      </h2>
+
+      {teams.length === 0 ? (
+        <p className="text-sm opacity-60">No teams yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {ordered.map((t) => {
+            const unread = unreadFor(t.id);
+            return (
+              <button
+                key={t.id}
+                onClick={() => openThread(t.id)}
+                className="flex items-center gap-3 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] p-3 text-left transition active:scale-[0.99]"
+              >
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: t.color }} />
+                <span className="font-display flex-1 truncate font-bold">{t.name}</span>
+                {unread > 0 && (
+                  <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--color-alert)] px-1.5 text-xs font-extrabold text-white">
+                    {unread}
+                  </span>
+                )}
+                <span className="opacity-40">💬</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Chat thread overlay */}
+      {selected && selectedTeam && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--color-paper)]">
+          <header className="flex items-center justify-between border-b-2 border-black/10 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: selectedTeam.color }} />
+              <div>
+                <p className="font-display font-extrabold leading-none">{selectedTeam.name}</p>
+                <p className="text-[11px] font-semibold opacity-50">Replying as the Chicken 🐔</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelected(null)}
+              aria-label="Close chat"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/10 text-lg font-bold"
+            >
+              ✕
+            </button>
+          </header>
+          <ChatThread
+            messages={thread}
+            viewerIsChicken
+            onSend={(content) => sendMessage(gameId, selectedTeam.id, "Chicken", content, true)}
+            emptyHint={`No messages with ${selectedTeam.name} yet.`}
+          />
         </div>
       )}
     </section>

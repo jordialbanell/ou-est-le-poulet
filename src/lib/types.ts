@@ -27,6 +27,16 @@ export interface TeamLocation {
   updated_at: string;
 }
 
+export interface Message {
+  id: string;
+  game_id: string;
+  team_id: string;
+  sender: string;
+  content: string;
+  is_chicken: boolean;
+  sent_at: string;
+}
+
 export interface BarCheckin {
   id: string;
   team_id: string;
