@@ -5,6 +5,7 @@ import type { BarCheckin, ChallengeCompletion, PendingChallenge, Team } from "..
 import { PointsCounter, ProgressBar, RefreshButton, ZonePills } from "./common";
 import { RulesModal } from "./RulesModal";
 import { EditTeamModal } from "./EditTeamModal";
+import { isVideoUrl } from "../lib/cloudinary";
 
 function timeOf(iso: string) {
   try {
@@ -56,6 +57,15 @@ export function Dashboard({
         .sort((a, b) => (b.reviewed_at ?? "").localeCompare(a.reviewed_at ?? "")),
     [pending, teamId],
   );
+  // challenge name -> evidence URL from the approved submission (if any).
+  const evidenceByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of pending) {
+      if (p.team_id !== teamId || p.status !== "approved" || !p.evidence_url) continue;
+      map.set(p.challenge_name, p.evidence_url);
+    }
+    return map;
+  }, [pending, teamId]);
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
@@ -143,15 +153,37 @@ export function Dashboard({
             {myCompletions.length === 0 && myRejected.length === 0 && (
               <p className="text-sm opacity-50">Nothing approved yet. Get out there.</p>
             )}
-            {myCompletions.map((c) => (
-              <div key={c.id} className="flex items-center gap-2 text-sm">
-                <span className="font-display w-9 shrink-0 font-extrabold text-green-700">
-                  +{c.points}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
-                <span className="shrink-0 text-xs opacity-50">{timeOf(c.completed_at)}</span>
-              </div>
-            ))}
+            {myCompletions.map((c) => {
+              const evidence = evidenceByName.get(c.challenge_name);
+              return (
+                <div key={c.id} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-display w-9 shrink-0 font-extrabold text-green-700">
+                      +{c.points}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+                    <span className="shrink-0 text-xs opacity-50">{timeOf(c.completed_at)}</span>
+                  </div>
+                  {evidence &&
+                    (isVideoUrl(evidence) ? (
+                      <video
+                        src={evidence}
+                        controls
+                        playsInline
+                        className="ml-9 max-h-48 w-[calc(100%-2.25rem)] rounded-lg border-2 border-black/10 bg-black object-contain"
+                      />
+                    ) : (
+                      <a href={evidence} target="_blank" rel="noopener noreferrer" className="ml-9">
+                        <img
+                          src={evidence}
+                          alt={c.challenge_name}
+                          className="h-16 w-16 rounded-lg border-2 border-black/10 object-cover"
+                        />
+                      </a>
+                    ))}
+                </div>
+              );
+            })}
             {myRejected.map((p) => (
               <div key={p.id} className="flex items-start gap-2 text-sm">
                 <span className="font-display w-9 shrink-0 font-extrabold text-[var(--color-alert)]">✕</span>

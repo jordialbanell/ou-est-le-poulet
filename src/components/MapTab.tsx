@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
-import { BARS, ZONES, barPosition, type Bar, type Zone } from "../lib/data";
+import { BARS, ZONES, type Bar, type Zone } from "../lib/data";
 import type { Team, TeamLocation } from "../lib/types";
 import type { GeoStatus } from "../hooks/useGeoTracking";
 
@@ -60,14 +60,10 @@ export function MapTab({
   const [findError, setFindError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
 
-  const barPins = useMemo(() => {
-    const perZone: Record<Zone, number> = { A: 0, B: 0, C: 0 };
-    return BARS.map((bar) => {
-      const idx = perZone[bar.zone]++;
-      const p = barPosition(bar.zone, idx);
-      return { bar, pos: { lat: p.lat, lng: p.lng } };
-    });
-  }, []);
+  const barPins = useMemo(
+    () => BARS.map((bar) => ({ bar, pos: { lat: bar.lat, lng: bar.lng } })),
+    [],
+  );
 
   const teamById = useMemo(() => {
     const m = new Map<string, Team>();
@@ -214,7 +210,7 @@ export function MapTab({
             {ZONES[z].label}
           </span>
         ))}
-        <span className="opacity-60">Bar pins are approximate within each zone.</span>
+        <span className="opacity-60">Tap a pin for details.</span>
       </div>
     </div>
   );

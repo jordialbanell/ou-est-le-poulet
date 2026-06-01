@@ -3,53 +3,49 @@ export type Zone = "A" | "B" | "C";
 export interface Bar {
   name: string;
   zone: Zone;
+  lat: number;
+  lng: number;
 }
 
-// NOTE: the source list had "LVLR Rooftop Bar" twice in Zone B — deduped here
-// so bar names stay unique (used as keys + check-in identifiers).
+// Exact GPS coordinates from the event KML.
 export const BARS: Bar[] = [
-  // Zone A — Clarke Quay / Riverside Point
-  { name: "Café Iguana Riverside Point", zone: "A" },
-  { name: "Yin Bar Singapore", zone: "A" },
-  { name: "Level Up - Live Music & Arcade Bar", zone: "A" },
-  { name: "Warehouse Bar", zone: "A" },
-  { name: "Errazuriz", zone: "A" },
-  { name: "Ichi Singapore", zone: "A" },
-  { name: "RedTail Bar By Zouk", zone: "A" },
-  { name: "Cuba Libre Café & Bar", zone: "A" },
-
-  // Zone B — Hong Kong St / Club St
-  { name: "28 Hongkong St", zone: "B" },
-  { name: "Drink Good Beer", zone: "B" },
-  { name: "Offtrack", zone: "B" },
-  { name: "The Good Beer Company", zone: "B" },
-  { name: "Employees Only Singapore", zone: "B" },
-  { name: "Daddy Cool Bar & Bistro", zone: "B" },
-  { name: "LVLR Rooftop Bar", zone: "B" },
-  { name: "Club 69", zone: "B" },
-  { name: "Azzurro Bistro Bar", zone: "B" },
-  { name: "Blu Jaz, Pekin Street", zone: "B" },
-  { name: "Lucid Bar", zone: "B" },
-  { name: "Marquee Bistro & Bar", zone: "B" },
-  { name: "D.F. Cantina by Barbary Coast", zone: "B" },
-  { name: "Kazbar", zone: "B" },
-  { name: "Miss G's Grill & Bar", zone: "B" },
-  { name: "LECOQ", zone: "B" },
-  { name: "Jab1", zone: "B" },
-  { name: "Skinny's Lounge", zone: "B" },
-
-  // Zone C — Boat Quay waterfront
-  { name: "Bar On Chulia", zone: "C" },
-  { name: "Taishike (Boat Quay)", zone: "C" },
-  { name: "Hero's", zone: "C" },
-  { name: "Molly Malone's Irish Pub", zone: "C" },
-  { name: "Mogambo Bar & Restaurant", zone: "C" },
-  { name: "JU95", zone: "C" },
-  { name: "Charlie's Restaurant & Bar", zone: "C" },
-  { name: "beGIN", zone: "C" },
-  { name: "The Penny Black", zone: "C" },
-  { name: "Waa Cow! CIMB Plaza", zone: "C" },
-  { name: "Dingtea Co. Ltd", zone: "C" },
+  { name: "JU95", zone: "C", lat: 1.2866095, lng: 103.8495598 },
+  { name: "The Penny Black", zone: "C", lat: 1.285934, lng: 103.849953 },
+  { name: "Skinny's Lounge", zone: "B", lat: 1.2885814, lng: 103.8491907 },
+  { name: "Charlie's Restaurant & Bar", zone: "C", lat: 1.2862228, lng: 103.8498206 },
+  { name: "Hero's", zone: "C", lat: 1.2864528, lng: 103.8490608 },
+  { name: "Molly Malone's Irish Pub", zone: "C", lat: 1.2859317, lng: 103.849344 },
+  { name: "D.F. Cantina by Barbary Coast", zone: "B", lat: 1.2862632, lng: 103.8485319 },
+  { name: "Mogambo Bar & Restaurant", zone: "C", lat: 1.286271, lng: 103.849461 },
+  { name: "beGIN", zone: "C", lat: 1.2858968, lng: 103.8499393 },
+  { name: "Taishike (Boat Quay)", zone: "B", lat: 1.2874247, lng: 103.8490143 },
+  { name: "Cuba Libre Café & Bar", zone: "A", lat: 1.290247, lng: 103.8464495 },
+  { name: "Offtrack", zone: "B", lat: 1.2869115, lng: 103.847206 },
+  { name: "Café Iguana Riverside Point", zone: "A", lat: 1.288951, lng: 103.8445214 },
+  { name: "Level Up - Live Music & Arcade Bar", zone: "A", lat: 1.289512, lng: 103.8450698 },
+  { name: "Yin Bar Singapore", zone: "A", lat: 1.2900912, lng: 103.8448906 },
+  { name: "Errazuriz", zone: "A", lat: 1.2890072, lng: 103.8453272 },
+  { name: "Daddy Cool Bar & Bistro", zone: "B", lat: 1.2883343, lng: 103.8477007 },
+  { name: "Lucid Bar", zone: "B", lat: 1.2872483, lng: 103.8483362 },
+  { name: "Ichi Singapore", zone: "A", lat: 1.2900995, lng: 103.8456752 },
+  { name: "Azzurro Bistro Bar", zone: "B", lat: 1.2816272, lng: 103.848203 },
+  { name: "Marquee Bistro & Bar", zone: "B", lat: 1.2844883, lng: 103.8484634 },
+  { name: "Club 69", zone: "B", lat: 1.287064, lng: 103.8481339 },
+  { name: "LVLR Rooftop Bar", zone: "B", lat: 1.2877858, lng: 103.8479233 },
+  { name: "28 Hongkong St", zone: "B", lat: 1.2876191, lng: 103.8469855 },
+  { name: "Jab1", zone: "B", lat: 1.2882168, lng: 103.8489234 },
+  { name: "RedTail Bar By Zouk", zone: "A", lat: 1.290948, lng: 103.845856 },
+  { name: "Warehouse Bar", zone: "A", lat: 1.290033, lng: 103.8450852 },
+  { name: "Kazbar", zone: "B", lat: 1.283605, lng: 103.8486302 },
+  { name: "Blu Jaz, Pekin Street", zone: "B", lat: 1.2838137, lng: 103.8482569 },
+  { name: "Miss G's Grill & Bar", zone: "B", lat: 1.283264, lng: 103.8486765 },
+  { name: "Bar On Chulia", zone: "C", lat: 1.2854944, lng: 103.8489536 },
+  { name: "Dingtea Co. Ltd", zone: "B", lat: 1.283228, lng: 103.848288 },
+  { name: "Drink Good Beer", zone: "B", lat: 1.2844019, lng: 103.8470546 },
+  { name: "The Good Beer Company", zone: "B", lat: 1.2840476, lng: 103.8476204 },
+  { name: "LECOQ", zone: "B", lat: 1.2834707, lng: 103.8487683 },
+  { name: "Employees Only Singapore", zone: "B", lat: 1.2820556, lng: 103.8476771 },
+  { name: "Waa Cow! CIMB Plaza", zone: "C", lat: 1.2841089, lng: 103.852015 },
 ];
 
 export const ZONES: Record<Zone, { label: string; description: string; color: string }> = {
@@ -59,26 +55,6 @@ export const ZONES: Record<Zone, { label: string; description: string; color: st
 };
 
 export const ZONE_ORDER: Zone[] = ["A", "B", "C"];
-
-// Approximate centre of each zone in Singapore (we don't have per-bar GPS, so
-// bar pins are spread deterministically around these on the map).
-export const ZONE_CENTERS: Record<Zone, { lat: number; lng: number }> = {
-  A: { lat: 1.2906, lng: 103.8462 }, // Clarke Quay / Riverside Point
-  B: { lat: 1.2846, lng: 103.8468 }, // Hong Kong St / Club St
-  C: { lat: 1.2868, lng: 103.8498 }, // Boat Quay
-};
-
-export const SINGAPORE_CENTER = { lat: 1.288, lng: 103.848 };
-
-/** Deterministic spread of a bar around its zone centre (no per-bar GPS data). */
-export function barPosition(zone: Zone, indexInZone: number): { lat: number; lng: number } {
-  const c = ZONE_CENTERS[zone];
-  // Golden-angle spiral so pins fan out evenly and don't overlap.
-  const golden = 2.399963229728653;
-  const a = indexInZone * golden;
-  const r = 0.0009 * Math.sqrt(indexInZone + 1); // ~100m steps
-  return { lat: c.lat + r * Math.cos(a), lng: c.lng + r * Math.sin(a) };
-}
 
 export type Difficulty = "easy" | "medium" | "hard" | "bonus" | "team";
 
