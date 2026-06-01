@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { completeChallenge } from "../lib/actions";
+import { submitForApproval } from "../lib/actions";
 import { playChime } from "../lib/sound";
 import type { PushedChallenge } from "../lib/types";
 
@@ -21,11 +21,17 @@ export function PushedChallengeToast({
     setBusy(true);
     setError(null);
     try {
-      await completeChallenge(gameId, teamId, push.challenge_text, push.points, "bonus");
+      // Submit for the Chicken's approval — points are never self-awarded.
+      await submitForApproval(gameId, teamId, {
+        challengeId: `pushed:${push.id}`,
+        challengeName: push.challenge_text,
+        points: push.points,
+        difficulty: "bonus",
+      });
       playChime();
       onDismiss();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add challenge.");
+      setError(e instanceof Error ? e.message : "Could not submit challenge.");
       setBusy(false);
     }
   }
@@ -53,7 +59,7 @@ export function PushedChallengeToast({
             disabled={busy}
             className="font-display min-h-[48px] flex-1 rounded-2xl bg-[var(--color-gold)] text-sm font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-60"
           >
-            {busy ? "Adding…" : `Accept (+${push.points})`}
+            {busy ? "Submitting…" : `Submit (+${push.points})`}
           </button>
           <button
             onClick={onDismiss}

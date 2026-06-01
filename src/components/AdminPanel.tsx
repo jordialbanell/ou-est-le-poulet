@@ -1,10 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useGame } from "../hooks/useGame";
-import { createGame, findGameByCode, pushChallenge, revealChicken } from "../lib/actions";
+import {
+  approvePending,
+  createGame,
+  findGameByCode,
+  pushChallenge,
+  rejectPending,
+  revealChicken,
+} from "../lib/actions";
 import { supabaseConfigured } from "../lib/supabase";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot } from "./common";
+import type { PendingChallenge, Team } from "../lib/types";
 
 export function AdminPanel() {
   const [params, setParams] = useSearchParams();
@@ -149,6 +157,9 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         </p>
       )}
 
+      {/* Approval queue */}
+      <ApprovalQueue pending={state.pendingChallenges} teams={state.teams} onFlash={flash} />
+
       {/* Share link */}
       <Card title="Join Link">
         <div className="flex items-center gap-2">
@@ -264,6 +275,116 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+function ApprovalQueue({
+  pending,
+  teams,
+  onFlash,
+}: {
+  pending: PendingChallenge[];
+  teams: Team[];
+  onFlash: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  const queue = pending
+    .filter((p) => p.status === "pending")
+    .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at));
+
+  const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? "Unknown team";
+  const teamColor = (id: string) => teams.find((t) => t.id === id)?.color ?? "#999";
+
+  async function act(p: PendingChallenge, kind: "approve" | "reject") {
+    if (busy.has(p.id)) return;
+    setError(null);
+    setBusy((s) => new Set(s).add(p.id));
+    try {
+      if (kind === "approve") {
+        await approvePending(p);
+        onFlash(`Approved "${p.challenge_name}" for ${teamName(p.team_id)} (+${p.points})`);
+      } else {
+        await rejectPending(p.id);
+        onFlash(`Rejected "${p.challenge_name}" for ${teamName(p.team_id)}`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy((s) => {
+        const n = new Set(s);
+        n.delete(p.id);
+        return n;
+      });
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border-2 border-[var(--color-gold)]/60 bg-[var(--color-gold)]/5 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="font-display text-sm font-bold uppercase tracking-widest text-[var(--color-gold)]">
+          Approval Queue
+        </h2>
+        {queue.length > 0 && (
+          <span className="font-display flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--color-gold)] px-1.5 text-xs font-extrabold text-white">
+            {queue.length}
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <p className="mb-2 text-sm font-semibold text-[var(--color-alert)]">{error}</p>
+      )}
+
+      {queue.length === 0 ? (
+        <p className="text-sm opacity-60">No submissions waiting. 🍗</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {queue.map((p) => {
+            const isBusy = busy.has(p.id);
+            return (
+              <div
+                key={p.id}
+                className="rounded-xl border-2 border-black/10 bg-[var(--color-paper)] p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: teamColor(p.team_id) }}
+                      />
+                      <p className="font-display truncate font-bold">{teamName(p.team_id)}</p>
+                    </div>
+                    <p className="mt-1 text-sm leading-snug">{p.challenge_name}</p>
+                  </div>
+                  <span className="font-display shrink-0 rounded-lg bg-[var(--color-gold)] px-2 py-0.5 text-sm font-extrabold text-white">
+                    +{p.points}
+                  </span>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => act(p, "approve")}
+                    disabled={isBusy}
+                    className="font-display min-h-[44px] flex-1 rounded-xl bg-green-600 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    ✓ Approve
+                  </button>
+                  <button
+                    onClick={() => act(p, "reject")}
+                    disabled={isBusy}
+                    className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-alert)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    ✕ Reject
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

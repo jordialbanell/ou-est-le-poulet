@@ -52,11 +52,28 @@ create table if not exists pushed_challenges (
   expires_at timestamptz
 );
 
+-- Challenge submissions awaiting the Chicken's approval.
+-- Teams can no longer add points directly: they submit here, the admin approves,
+-- and only then is a row written to challenge_completions.
+create table if not exists pending_challenges (
+  id uuid default gen_random_uuid() primary key,
+  team_id uuid references teams(id) on delete cascade,
+  game_id uuid references games(id) on delete cascade,
+  challenge_name text not null,
+  challenge_id text not null,
+  points integer not null,
+  difficulty text not null,
+  status text not null default 'pending',   -- 'pending' | 'approved' | 'rejected'
+  submitted_at timestamptz default now(),
+  reviewed_at timestamptz
+);
+
 -- Enable realtime on all tables (ignore "already member" errors on re-run)
 alter publication supabase_realtime add table teams;
 alter publication supabase_realtime add table bar_checkins;
 alter publication supabase_realtime add table challenge_completions;
 alter publication supabase_realtime add table pushed_challenges;
+alter publication supabase_realtime add table pending_challenges;
 alter publication supabase_realtime add table games;
 
 -- RLS: allow all reads and inserts (no auth needed for this game)
@@ -65,6 +82,7 @@ alter table teams enable row level security;
 alter table bar_checkins enable row level security;
 alter table challenge_completions enable row level security;
 alter table pushed_challenges enable row level security;
+alter table pending_challenges enable row level security;
 
 drop policy if exists "Public read" on games;
 drop policy if exists "Public insert" on games;
@@ -96,3 +114,10 @@ drop policy if exists "Public read" on pushed_challenges;
 drop policy if exists "Public insert" on pushed_challenges;
 create policy "Public read"   on pushed_challenges for select using (true);
 create policy "Public insert" on pushed_challenges for insert with check (true);
+
+drop policy if exists "Public read" on pending_challenges;
+drop policy if exists "Public insert" on pending_challenges;
+drop policy if exists "Public update" on pending_challenges;
+create policy "Public read"   on pending_challenges for select using (true);
+create policy "Public insert" on pending_challenges for insert with check (true);
+create policy "Public update" on pending_challenges for update using (true);

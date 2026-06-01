@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { TEAM_COLORS, type Difficulty, type Zone } from "./data";
-import type { Game, Team } from "./types";
+import type { Game, PendingChallenge, Team } from "./types";
 
 /** Generate a random 4-digit game code as a string (e.g. "4269"). */
 export function makeGameCode(): string {
@@ -87,11 +87,54 @@ export async function completeChallenge(
   if (error) throw error;
 }
 
-export async function undoChallenge(completionId: string) {
+// ── Approval flow ───────────────────────────────────────────────
+// Teams submit here; only the Chicken (admin) can turn a submission into points.
+
+export interface SubmissionInput {
+  challengeId: string;
+  challengeName: string;
+  points: number;
+  difficulty: Difficulty;
+}
+
+export async function submitForApproval(
+  gameId: string,
+  teamId: string,
+  challenge: SubmissionInput,
+) {
+  const { error } = await supabase.from("pending_challenges").insert({
+    game_id: gameId,
+    team_id: teamId,
+    challenge_id: challenge.challengeId,
+    challenge_name: challenge.challengeName,
+    points: challenge.points,
+    difficulty: challenge.difficulty,
+    status: "pending",
+  });
+  if (error) throw error;
+}
+
+export async function approvePending(pending: PendingChallenge) {
+  // Award the points first; only mark approved if that succeeds.
+  await completeChallenge(
+    pending.game_id,
+    pending.team_id,
+    pending.challenge_name,
+    pending.points,
+    pending.difficulty,
+  );
   const { error } = await supabase
-    .from("challenge_completions")
-    .delete()
-    .eq("id", completionId);
+    .from("pending_challenges")
+    .update({ status: "approved", reviewed_at: new Date().toISOString() })
+    .eq("id", pending.id);
+  if (error) throw error;
+}
+
+export async function rejectPending(pendingId: string) {
+  const { error } = await supabase
+    .from("pending_challenges")
+    .update({ status: "rejected", reviewed_at: new Date().toISOString() })
+    .eq("id", pendingId);
   if (error) throw error;
 }
 

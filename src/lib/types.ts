@@ -43,3 +43,18 @@ export interface PushedChallenge {
   pushed_at: string;
   expires_at: string | null;
 }
+
+export type PendingStatus = "pending" | "approved" | "rejected";
+
+export interface PendingChallenge {
+  id: string;
+  team_id: string;
+  game_id: string;
+  challenge_name: string;
+  challenge_id: string;
+  points: number;
+  difficulty: Difficulty;
+  status: PendingStatus;
+  submitted_at: string;
+  reviewed_at: string | null;
+}

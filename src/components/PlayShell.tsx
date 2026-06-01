@@ -128,6 +128,7 @@ export function PlayShell() {
             teamId={team.teamId}
             teamName={teamName}
             completions={state.completions}
+            pending={state.pendingChallenges}
           />
         )}
         {tab === "leaderboard" && (
