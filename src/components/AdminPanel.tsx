@@ -14,9 +14,11 @@ import {
 } from "../lib/actions";
 import { supabaseConfigured } from "../lib/supabase";
 import { isVideoUrl } from "../lib/cloudinary";
+import { evidenceByChallengeName } from "../lib/evidence";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot, RefreshButton } from "./common";
 import { ChatThread } from "./ChatThread";
+import { Gallery } from "./Gallery";
 import { useToast } from "./Toast";
 import type { ChallengeCompletion, Message, PendingChallenge, Team } from "../lib/types";
 
@@ -373,6 +375,9 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
           })}
         </div>
       </Card>
+
+      {/* All media submitted across the game */}
+      <Gallery teams={state.teams} pending={state.pendingChallenges} checkins={state.checkins} />
     </div>
   );
 }
@@ -770,6 +775,7 @@ function TeamPoints({
   const rejected = pending
     .filter((p) => p.team_id === teamId && p.status === "rejected")
     .sort((a, b) => (b.reviewed_at ?? "").localeCompare(a.reviewed_at ?? ""));
+  const evidenceMap = evidenceByChallengeName(pending, teamId);
 
   function withBusy(id: string, fn: () => Promise<void>) {
     if (busy.has(id)) return;
@@ -811,54 +817,76 @@ function TeamPoints({
         <p className="text-xs opacity-50">No submissions yet.</p>
       )}
 
-      {approved.map((c) => (
-        <div key={c.id} className="flex items-center gap-2 text-sm">
-          {editing === c.id ? (
-            <>
-              <input
-                type="number"
-                value={editVal}
-                onChange={(e) => setEditVal(Number(e.target.value))}
-                className="w-14 rounded-lg border-2 border-black/15 bg-white px-2 py-1 text-sm"
-              />
-              <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
-              <button
-                onClick={() => withBusy(c.id, () => saveEdit(c))}
-                className="font-display rounded-lg bg-green-600 px-2 py-1 text-xs font-bold text-white"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setEditing(null)}
-                className="text-xs font-bold opacity-60"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="font-display w-8 shrink-0 font-extrabold text-green-700">+{c.points}</span>
-              <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
-              <button
-                onClick={() => {
-                  setEditing(c.id);
-                  setEditVal(c.points);
-                }}
-                className="font-display rounded-lg border-2 border-black/15 px-2 py-1 text-xs font-bold"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => withBusy(c.id, () => remove(c))}
-                disabled={busy.has(c.id)}
-                className="font-display rounded-lg bg-[var(--color-alert)] px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
-              >
-                Remove
-              </button>
-            </>
-          )}
-        </div>
-      ))}
+      {approved.map((c) => {
+        const evidence = evidenceMap.get(c.challenge_name);
+        return (
+          <div key={c.id} className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm">
+              {editing === c.id ? (
+                <>
+                  <input
+                    type="number"
+                    value={editVal}
+                    onChange={(e) => setEditVal(Number(e.target.value))}
+                    className="w-14 rounded-lg border-2 border-black/15 bg-white px-2 py-1 text-sm"
+                  />
+                  <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+                  <button
+                    onClick={() => withBusy(c.id, () => saveEdit(c))}
+                    className="font-display rounded-lg bg-green-600 px-2 py-1 text-xs font-bold text-white"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditing(null)}
+                    className="text-xs font-bold opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="font-display w-8 shrink-0 font-extrabold text-green-700">+{c.points}</span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+                  <button
+                    onClick={() => {
+                      setEditing(c.id);
+                      setEditVal(c.points);
+                    }}
+                    className="font-display rounded-lg border-2 border-black/15 px-2 py-1 text-xs font-bold"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => withBusy(c.id, () => remove(c))}
+                    disabled={busy.has(c.id)}
+                    className="font-display rounded-lg bg-[var(--color-alert)] px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
+            {evidence &&
+              (isVideoUrl(evidence) ? (
+                <video
+                  src={evidence}
+                  controls
+                  playsInline
+                  className="ml-10 max-h-44 w-[calc(100%-2.5rem)] rounded-lg border-2 border-black/10 bg-black object-contain"
+                />
+              ) : (
+                <a href={evidence} target="_blank" rel="noopener noreferrer" className="ml-10">
+                  <img
+                    src={evidence}
+                    alt={c.challenge_name}
+                    className="h-14 w-14 rounded-lg border-2 border-black/10 object-cover"
+                  />
+                </a>
+              ))}
+          </div>
+        );
+      })}
 
       {rejected.map((p) => (
         <div key={p.id} className="flex items-start gap-2 text-sm">

@@ -6,6 +6,7 @@ import { PointsCounter, ProgressBar, RefreshButton, ZonePills } from "./common";
 import { RulesModal } from "./RulesModal";
 import { EditTeamModal } from "./EditTeamModal";
 import { isVideoUrl } from "../lib/cloudinary";
+import { evidenceByChallengeName } from "../lib/evidence";
 
 function timeOf(iso: string) {
   try {
@@ -57,15 +58,11 @@ export function Dashboard({
         .sort((a, b) => (b.reviewed_at ?? "").localeCompare(a.reviewed_at ?? "")),
     [pending, teamId],
   );
-  // challenge name -> evidence URL from the approved submission (if any).
-  const evidenceByName = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of pending) {
-      if (p.team_id !== teamId || p.status !== "approved" || !p.evidence_url) continue;
-      map.set(p.challenge_name, p.evidence_url);
-    }
-    return map;
-  }, [pending, teamId]);
+  // challenge name -> evidence URL from this team's submission (if any).
+  const evidenceByName = useMemo(
+    () => evidenceByChallengeName(pending, teamId),
+    [pending, teamId],
+  );
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
