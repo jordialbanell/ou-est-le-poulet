@@ -7,6 +7,7 @@ import type {
   PendingChallenge,
   PushedChallenge,
   Team,
+  TeamLocation,
 } from "../lib/types";
 
 export interface GameState {
@@ -16,6 +17,7 @@ export interface GameState {
   completions: ChallengeCompletion[];
   pushedChallenges: PushedChallenge[];
   pendingChallenges: PendingChallenge[];
+  teamLocations: TeamLocation[];
   loading: boolean;
   error: string | null;
   connected: boolean;
@@ -37,6 +39,7 @@ export function useGame(gameId: string | null): GameState {
   const [completions, setCompletions] = useState<ChallengeCompletion[]>([]);
   const [pushedChallenges, setPushedChallenges] = useState<PushedChallenge[]>([]);
   const [pendingChallenges, setPendingChallenges] = useState<PendingChallenge[]>([]);
+  const [teamLocations, setTeamLocations] = useState<TeamLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -100,6 +103,15 @@ export function useGame(gameId: string | null): GameState {
     if (data) setPendingChallenges(data);
   }, [gameId]);
 
+  const fetchLocations = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from("team_locations")
+      .select()
+      .eq("game_id", gameId);
+    if (data) setTeamLocations(data);
+  }, [gameId]);
+
   const refresh = useCallback(async () => {
     if (!gameId) return;
     setError(null);
@@ -111,11 +123,21 @@ export function useGame(gameId: string | null): GameState {
         fetchCompletions(),
         fetchPushed(),
         fetchPending(),
+        fetchLocations(),
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load game data.");
     }
-  }, [gameId, fetchGame, fetchTeams, fetchCheckins, fetchCompletions, fetchPushed, fetchPending]);
+  }, [
+    gameId,
+    fetchGame,
+    fetchTeams,
+    fetchCheckins,
+    fetchCompletions,
+    fetchPushed,
+    fetchPending,
+    fetchLocations,
+  ]);
 
   // Initial load.
   useEffect(() => {
@@ -201,6 +223,16 @@ export function useGame(gameId: string | null): GameState {
       )
       .on(
         "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "team_locations",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => void fetchLocations(),
+      )
+      .on(
+        "postgres_changes",
         { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
         (payload) => setGame(payload.new as Game),
       )
@@ -211,7 +243,15 @@ export function useGame(gameId: string | null): GameState {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [gameId, fetchTeams, fetchCheckins, fetchCompletions, fetchPushed, fetchPending]);
+  }, [
+    gameId,
+    fetchTeams,
+    fetchCheckins,
+    fetchCompletions,
+    fetchPushed,
+    fetchPending,
+    fetchLocations,
+  ]);
 
   const dismissPush = useCallback(() => setNewPush(null), []);
 
@@ -222,6 +262,7 @@ export function useGame(gameId: string | null): GameState {
     completions,
     pushedChallenges,
     pendingChallenges,
+    teamLocations,
     loading,
     error,
     connected,

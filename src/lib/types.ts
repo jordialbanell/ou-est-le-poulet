@@ -14,6 +14,17 @@ export interface Team {
   name: string;
   created_at: string;
   color: string;
+  members: string | null;
+  selfie_url: string | null;
+}
+
+export interface TeamLocation {
+  id: string;
+  team_id: string;
+  game_id: string;
+  lat: number;
+  lng: number;
+  updated_at: string;
 }
 
 export interface BarCheckin {
@@ -57,4 +68,5 @@ export interface PendingChallenge {
   status: PendingStatus;
   submitted_at: string;
   reviewed_at: string | null;
+  evidence_url: string | null;
 }

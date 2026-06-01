@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { findGameByCode, joinTeam } from "../lib/actions";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { useTeam } from "../hooks/useTeam";
+import { MediaUpload } from "./MediaUpload";
 
 export function JoinScreen() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export function JoinScreen() {
 
   const [code, setCode] = useState(params.get("code") ?? "");
   const [name, setName] = useState("");
+  const [members, setMembers] = useState("");
+  const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +48,10 @@ export function JoinScreen() {
         .select("id", { count: "exact", head: true })
         .eq("game_id", game.id);
 
-      const team = await joinTeam(game.id, cleanName, count ?? 0);
+      const team = await joinTeam(game.id, cleanName, count ?? 0, {
+        members,
+        selfie_url: selfieUrl,
+      });
       setTeam({
         teamId: team.id,
         gameId: game.id,
@@ -99,8 +105,30 @@ export function JoinScreen() {
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 40))}
             placeholder="The Cluckers"
-            className="mb-5 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-4 text-lg font-semibold outline-none transition focus:border-[var(--color-gold)]"
+            className="mb-4 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-4 text-lg font-semibold outline-none transition focus:border-[var(--color-gold)]"
           />
+
+          <label className="mb-1 block text-xs font-bold uppercase tracking-wide opacity-60">
+            Team Members
+          </label>
+          <input
+            value={members}
+            onChange={(e) => setMembers(e.target.value.slice(0, 200))}
+            placeholder="Alex, Sam, Jordi…"
+            className="mb-4 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-3 text-base font-semibold outline-none transition focus:border-[var(--color-gold)]"
+          />
+
+          <label className="mb-1 block text-xs font-bold uppercase tracking-wide opacity-60">
+            Team Selfie
+          </label>
+          <div className="mb-5">
+            <MediaUpload
+              value={selfieUrl}
+              onUploaded={setSelfieUrl}
+              accept="image/*"
+              label="Take / upload selfie"
+            />
+          </div>
 
           {error && (
             <p className="mb-4 rounded-xl bg-[var(--color-alert)]/10 px-4 py-3 text-sm font-semibold text-[var(--color-alert)]">
@@ -116,13 +144,6 @@ export function JoinScreen() {
             {busy ? "Joining…" : "Join the Hunt"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-xs opacity-50">
-          Are you the Chicken?{" "}
-          <a href="/admin" className="font-semibold underline">
-            Open the admin panel
-          </a>
-        </p>
       </div>
     </div>
   );

@@ -3,33 +3,43 @@ import { useNavigate } from "react-router-dom";
 import { useTeam } from "../hooks/useTeam";
 import { useGame } from "../hooks/useGame";
 import { useDarkMode } from "../hooks/useDarkMode";
+import { useGeoTracking } from "../hooks/useGeoTracking";
 import { computeWinStatus } from "../lib/scoring";
 import { Dashboard } from "./Dashboard";
 import { BarsTab } from "./BarsTab";
 import { ChallengesTab } from "./ChallengesTab";
 import { LeaderboardTab } from "./LeaderboardTab";
+import { MapTab } from "./MapTab";
 import { WinBanner } from "./WinBanner";
 import { PushedChallengeToast } from "./PushedChallengeToast";
 import { LiveDot, Spinner } from "./common";
 
-type Tab = "home" | "bars" | "challenges" | "leaderboard";
+type Tab = "home" | "bars" | "challenges" | "leaderboard" | "map";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "🏠" },
   { id: "bars", label: "Bars", icon: "🍺" },
   { id: "challenges", label: "Tasks", icon: "🎯" },
   { id: "leaderboard", label: "Ranks", icon: "🏆" },
+  { id: "map", label: "Map", icon: "🗺️" },
 ];
 
 export function PlayShell() {
   const navigate = useNavigate();
-  const { team, clearTeam } = useTeam();
+  const { team, clearTeam, setTeam } = useTeam();
   const { dark, toggle } = useDarkMode();
   const [tab, setTab] = useState<Tab>("home");
   const [showWin, setShowWin] = useState(false);
   const wasWinning = useRef(false);
 
   const state = useGame(team?.gameId ?? null);
+
+  // Share this team's live GPS while playing.
+  const { status: geoStatus } = useGeoTracking(
+    team?.gameId ?? null,
+    team?.teamId ?? null,
+    Boolean(team),
+  );
 
   // Redirect to join if no stored team.
   useEffect(() => {
@@ -111,12 +121,14 @@ export function PlayShell() {
       <main className="flex-1 pt-4">
         {tab === "home" && (
           <Dashboard
+            team={currentTeam ?? null}
             teamId={team.teamId}
             teamName={teamName}
             teamColor={teamColor}
             checkins={state.checkins}
             completions={state.completions}
             chickenLocation={state.game?.chicken_location ?? null}
+            onRenamed={(name) => setTeam({ ...team, teamName: name })}
           />
         )}
         {tab === "bars" && (
@@ -139,10 +151,18 @@ export function PlayShell() {
             currentTeamId={team.teamId}
           />
         )}
+        {tab === "map" && (
+          <MapTab
+            teams={state.teams}
+            teamLocations={state.teamLocations}
+            currentTeamId={team.teamId}
+            geoStatus={geoStatus}
+          />
+        )}
       </main>
 
       {/* Bottom nav */}
-      <nav className="safe-bottom sticky bottom-0 z-20 grid grid-cols-4 border-t-2 border-black/10 bg-[var(--color-paper)]/95 backdrop-blur">
+      <nav className="safe-bottom sticky bottom-0 z-20 grid grid-cols-5 border-t-2 border-black/10 bg-[var(--color-paper)]/95 backdrop-blur">
         {TABS.map((t) => {
           const active = tab === t.id;
           return (

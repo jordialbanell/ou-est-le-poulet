@@ -60,6 +60,26 @@ export const ZONES: Record<Zone, { label: string; description: string; color: st
 
 export const ZONE_ORDER: Zone[] = ["A", "B", "C"];
 
+// Approximate centre of each zone in Singapore (we don't have per-bar GPS, so
+// bar pins are spread deterministically around these on the map).
+export const ZONE_CENTERS: Record<Zone, { lat: number; lng: number }> = {
+  A: { lat: 1.2906, lng: 103.8462 }, // Clarke Quay / Riverside Point
+  B: { lat: 1.2846, lng: 103.8468 }, // Hong Kong St / Club St
+  C: { lat: 1.2868, lng: 103.8498 }, // Boat Quay
+};
+
+export const SINGAPORE_CENTER = { lat: 1.288, lng: 103.848 };
+
+/** Deterministic spread of a bar around its zone centre (no per-bar GPS data). */
+export function barPosition(zone: Zone, indexInZone: number): { lat: number; lng: number } {
+  const c = ZONE_CENTERS[zone];
+  // Golden-angle spiral so pins fan out evenly and don't overlap.
+  const golden = 2.399963229728653;
+  const a = indexInZone * golden;
+  const r = 0.0009 * Math.sqrt(indexInZone + 1); // ~100m steps
+  return { lat: c.lat + r * Math.cos(a), lng: c.lng + r * Math.sin(a) };
+}
+
 export type Difficulty = "easy" | "medium" | "hard" | "bonus" | "team";
 
 export interface Challenge {

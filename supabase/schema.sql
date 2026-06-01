@@ -93,8 +93,10 @@ create policy "Public update" on games for update using (true);
 
 drop policy if exists "Public read" on teams;
 drop policy if exists "Public insert" on teams;
+drop policy if exists "Public update" on teams;
 create policy "Public read"   on teams for select using (true);
 create policy "Public insert" on teams for insert with check (true);
+create policy "Public update" on teams for update using (true);  -- edit team on Home tab
 
 drop policy if exists "Public read" on bar_checkins;
 drop policy if exists "Public insert" on bar_checkins;
@@ -121,3 +123,30 @@ drop policy if exists "Public update" on pending_challenges;
 create policy "Public read"   on pending_challenges for select using (true);
 create policy "Public insert" on pending_challenges for insert with check (true);
 create policy "Public update" on pending_challenges for update using (true);
+
+-- ============================================================
+--  Cloudinary evidence + team profiles + live GPS tracking
+-- ============================================================
+
+alter table pending_challenges add column if not exists evidence_url text;
+alter table teams add column if not exists members text;
+alter table teams add column if not exists selfie_url text;
+
+create table if not exists team_locations (
+  id uuid default gen_random_uuid() primary key,
+  team_id uuid references teams(id) on delete cascade,
+  game_id uuid references games(id) on delete cascade,
+  lat float not null,
+  lng float not null,
+  updated_at timestamptz default now()
+);
+
+alter publication supabase_realtime add table team_locations;
+
+alter table team_locations enable row level security;
+drop policy if exists "Public read" on team_locations;
+drop policy if exists "Public insert" on team_locations;
+drop policy if exists "Public update" on team_locations;
+create policy "Public read"   on team_locations for select using (true);
+create policy "Public insert" on team_locations for insert with check (true);
+create policy "Public update" on team_locations for update using (true);

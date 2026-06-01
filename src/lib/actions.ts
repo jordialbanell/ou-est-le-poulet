@@ -35,15 +35,45 @@ export async function findGameByCode(code: string): Promise<Game | null> {
   return data;
 }
 
+export interface TeamProfile {
+  members?: string | null;
+  selfie_url?: string | null;
+}
+
 export async function joinTeam(
   gameId: string,
   name: string,
   existingTeamCount: number,
+  profile: TeamProfile = {},
 ): Promise<Team> {
   const color = TEAM_COLORS[existingTeamCount % TEAM_COLORS.length];
   const { data, error } = await supabase
     .from("teams")
-    .insert({ game_id: gameId, name: name.trim(), color })
+    .insert({
+      game_id: gameId,
+      name: name.trim(),
+      color,
+      members: profile.members?.trim() || null,
+      selfie_url: profile.selfie_url || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTeam(
+  teamId: string,
+  fields: { name?: string; members?: string | null; selfie_url?: string | null },
+): Promise<Team> {
+  const patch: Record<string, string | null> = {};
+  if (fields.name !== undefined) patch.name = fields.name.trim();
+  if (fields.members !== undefined) patch.members = fields.members?.trim() || null;
+  if (fields.selfie_url !== undefined) patch.selfie_url = fields.selfie_url || null;
+  const { data, error } = await supabase
+    .from("teams")
+    .update(patch)
+    .eq("id", teamId)
     .select()
     .single();
   if (error) throw error;
@@ -95,6 +125,7 @@ export interface SubmissionInput {
   challengeName: string;
   points: number;
   difficulty: Difficulty;
+  evidenceUrl?: string | null;
 }
 
 export async function submitForApproval(
@@ -110,6 +141,7 @@ export async function submitForApproval(
     points: challenge.points,
     difficulty: challenge.difficulty,
     status: "pending",
+    evidence_url: challenge.evidenceUrl || null,
   });
   if (error) throw error;
 }
@@ -157,4 +189,50 @@ export async function revealChicken(gameId: string, location: string) {
     .update({ chicken_location: location })
     .eq("id", gameId);
   if (error) throw error;
+}
+
+// ── Live GPS ────────────────────────────────────────────────────
+// One row per team, kept fresh. We track the row id locally and update it;
+// the first fix inserts (or reuses an existing row for the team).
+
+export async function upsertTeamLocation(
+  gameId: string,
+  teamId: string,
+  lat: number,
+  lng: number,
+  knownRowId: string | null,
+): Promise<string> {
+  if (knownRowId) {
+    const { error } = await supabase
+      .from("team_locations")
+      .update({ lat, lng, updated_at: new Date().toISOString() })
+      .eq("id", knownRowId);
+    if (error) throw error;
+    return knownRowId;
+  }
+
+  // No known row yet — reuse one if this team already has it, else insert.
+  const { data: existing } = await supabase
+    .from("team_locations")
+    .select("id")
+    .eq("team_id", teamId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("team_locations")
+      .update({ lat, lng, updated_at: new Date().toISOString() })
+      .eq("id", existing.id);
+    if (error) throw error;
+    return existing.id;
+  }
+
+  const { data, error } = await supabase
+    .from("team_locations")
+    .insert({ game_id: gameId, team_id: teamId, lat, lng })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
 }

@@ -9,6 +9,7 @@ import {
 import { pushChallenge, submitForApproval } from "../lib/actions";
 import { playChime } from "../lib/sound";
 import type { ChallengeCompletion, PendingChallenge } from "../lib/types";
+import { MediaUpload } from "./MediaUpload";
 
 const FILTERS: { id: "all" | Difficulty; label: string }[] = [
   { id: "all", label: "All" },
@@ -19,6 +20,8 @@ const FILTERS: { id: "all" | Difficulty; label: string }[] = [
 ];
 
 type CardStatus = "completed" | "pending" | "rejected" | "open";
+
+const requiresEvidence = (ch: Challenge) => Boolean(ch.requiresPhoto || ch.requiresVideo);
 
 export function ChallengesTab({
   gameId,
@@ -37,6 +40,8 @@ export function ChallengesTab({
   const [error, setError] = useState<string | null>(null);
   const [pushedNote, setPushedNote] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | Difficulty>("all");
+  // challenge id -> uploaded evidence URL (before submission)
+  const [evidence, setEvidence] = useState<Record<string, string | null>>({});
 
   // "team" challenges only appear under All (no dedicated filter pill).
   const visibleDiffs = filter === "all" ? DIFFICULTY_ORDER : [filter];
@@ -85,6 +90,13 @@ export function ChallengesTab({
         challengeName: ch.name,
         points: ch.points,
         difficulty: ch.difficulty,
+        evidenceUrl: evidence[ch.id] ?? null,
+      });
+      // Drop the staged evidence now that it's attached to a submission.
+      setEvidence((e) => {
+        const n = { ...e };
+        delete n[ch.id];
+        return n;
       });
       playChime();
     } catch (e) {
@@ -218,11 +230,29 @@ export function ChallengesTab({
                     </span>
                   </div>
 
+                  {/* Evidence upload — shown when the team can (re)submit */}
+                  {(status === "open" || status === "rejected") && (
+                    <div className="mt-3">
+                      <MediaUpload
+                        value={evidence[ch.id] ?? null}
+                        onUploaded={(url) => setEvidence((e) => ({ ...e, [ch.id]: url }))}
+                        compact
+                        label={ch.requiresVideo ? "Add video" : "Add photo / video"}
+                      />
+                      {requiresEvidence(ch) && !evidence[ch.id] && (
+                        <p className="mt-1 text-xs font-semibold text-[var(--color-alert)]">
+                          {ch.requiresVideo ? "🎥 Video" : "📷 Photo"} evidence required before submitting.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mt-3 flex gap-2">
                     <SubmitButton
                       status={status}
                       points={ch.points}
                       busy={isBusy}
+                      blocked={requiresEvidence(ch) && !evidence[ch.id]}
                       onSubmit={() => submit(ch)}
                     />
                     {diff === "team" && status !== "completed" && (
@@ -248,11 +278,13 @@ function SubmitButton({
   status,
   points,
   busy,
+  blocked = false,
   onSubmit,
 }: {
   status: CardStatus;
   points: number;
   busy: boolean;
+  blocked?: boolean;
   onSubmit: () => void;
 }) {
   if (status === "completed") {
@@ -273,7 +305,7 @@ function SubmitButton({
   return (
     <button
       onClick={onSubmit}
-      disabled={busy}
+      disabled={busy || blocked}
       className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-gold)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
     >
       {busy ? "Submitting…" : status === "rejected" ? "Submit again" : "Submit for approval"}

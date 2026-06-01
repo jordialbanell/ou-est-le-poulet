@@ -1,38 +1,63 @@
 import { useState } from "react";
 import { POINTS_TO_WIN } from "../lib/data";
 import { computeWinStatus, MANDATORY_DRINK_BARS } from "../lib/scoring";
-import type { BarCheckin, ChallengeCompletion } from "../lib/types";
+import type { BarCheckin, ChallengeCompletion, Team } from "../lib/types";
 import { PointsCounter, ProgressBar, ZonePills } from "./common";
+import { RulesModal } from "./RulesModal";
+import { EditTeamModal } from "./EditTeamModal";
 
 export function Dashboard({
+  team,
   teamId,
   teamName,
   teamColor,
   checkins,
   completions,
   chickenLocation,
+  onRenamed,
 }: {
+  team: Team | null;
   teamId: string;
   teamName: string;
   teamColor: string;
   checkins: BarCheckin[];
   completions: ChallengeCompletion[];
   chickenLocation: string | null;
+  onRenamed: (name: string) => void;
 }) {
   const status = computeWinStatus(teamId, checkins, completions);
-  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
       {/* Team header */}
-      <div className="animate-rise">
-        <p className="text-xs font-bold uppercase tracking-widest opacity-50">Your Team</p>
-        <h2
-          className="font-display text-3xl font-extrabold leading-tight"
-          style={{ color: teamColor }}
+      <div className="animate-rise flex items-center gap-3">
+        {team?.selfie_url && (
+          <img
+            src={team.selfie_url}
+            alt={`${teamName} selfie`}
+            className="h-16 w-16 shrink-0 rounded-2xl border-2 object-cover"
+            style={{ borderColor: teamColor }}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-widest opacity-50">Your Team</p>
+          <h2
+            className="font-display truncate text-3xl font-extrabold leading-tight"
+            style={{ color: teamColor }}
+          >
+            {teamName}
+          </h2>
+          {team?.members && <p className="truncate text-sm font-semibold opacity-60">{team.members}</p>}
+        </div>
+        <button
+          onClick={() => setShowEdit(true)}
+          disabled={!team}
+          className="font-display shrink-0 rounded-xl border-2 border-black/15 px-3 py-2 text-xs font-bold uppercase disabled:opacity-40"
         >
-          {teamName}
-        </h2>
+          Edit
+        </button>
       </div>
 
       {/* Chicken reveal banner */}
@@ -82,41 +107,19 @@ export function Dashboard({
         />
       </div>
 
-      {/* The big button */}
+      {/* Rules & win conditions */}
       <button
-        onClick={() => setShowBreakdown((v) => !v)}
-        className={`font-display min-h-[88px] w-full rounded-3xl text-2xl font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] ${
-          status.canSitDown
-            ? "animate-glow-gold bg-[var(--color-gold)]"
-            : "animate-pulse-alert bg-[var(--color-alert)]"
+        onClick={() => setShowRules(true)}
+        className={`font-display min-h-[72px] w-full rounded-3xl text-xl font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] ${
+          status.canSitDown ? "animate-glow-gold bg-[var(--color-gold)]" : "bg-[var(--color-gold)]"
         }`}
       >
-        {status.canSitDown ? "🍗 WE CAN SIT DOWN! 🍗" : "CAN WE SIT DOWN?"}
+        {status.canSitDown ? "🍗 You can sit down — see rules" : "📜 View Rules & Win Conditions"}
       </button>
 
-      {showBreakdown && (
-        <div className="animate-rise rounded-2xl border-2 border-black/10 bg-white/70 p-4">
-          <p className="font-display mb-3 text-lg font-bold">
-            {status.canSitDown ? "All conditions met 🎉" : "Still need to:"}
-          </p>
-          <ul className="flex flex-col gap-2">
-            <Condition met={status.zonesVisited.size === 3}>
-              Visit all 3 zones ({status.zonesVisited.size}/3)
-            </Condition>
-            <Condition met={status.totalPoints >= POINTS_TO_WIN}>
-              Earn {POINTS_TO_WIN} points ({status.totalPoints}/{POINTS_TO_WIN})
-            </Condition>
-          </ul>
-          {!status.canSitDown && (
-            <div className="mt-3 border-t border-black/10 pt-3">
-              {status.missingConditions.map((m) => (
-                <p key={m} className="text-sm font-semibold text-[var(--color-alert)]">
-                  → {m}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
+      {showRules && <RulesModal status={status} onClose={() => setShowRules(false)} />}
+      {showEdit && team && (
+        <EditTeamModal team={team} onClose={() => setShowEdit(false)} onSaved={onRenamed} />
       )}
     </div>
   );
@@ -128,20 +131,5 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <p className="text-xs font-bold uppercase tracking-widest opacity-50">{label}</p>
       <p className="font-display mt-1 text-3xl font-extrabold">{value}</p>
     </div>
-  );
-}
-
-function Condition({ met, children }: { met: boolean; children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-3">
-      <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-          met ? "bg-green-600" : "bg-black/20"
-        }`}
-      >
-        {met ? "✓" : "•"}
-      </span>
-      <span className={`font-semibold ${met ? "" : "opacity-70"}`}>{children}</span>
-    </li>
   );
 }

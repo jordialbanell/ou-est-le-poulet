@@ -10,11 +10,65 @@ import {
   revealChicken,
 } from "../lib/actions";
 import { supabaseConfigured } from "../lib/supabase";
+import { isVideoUrl } from "../lib/cloudinary";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot } from "./common";
 import type { PendingChallenge, Team } from "../lib/types";
 
+const ADMIN_PASSWORD = "Poulet2026!";
+const ADMIN_SESSION_KEY = "oelp.admin";
+
 export function AdminPanel() {
+  const [authed, setAuthed] = useState(
+    () => sessionStorage.getItem(ADMIN_SESSION_KEY) === "ok",
+  );
+  if (!authed) return <AdminGate onUnlock={() => setAuthed(true)} />;
+  return <AdminPanelInner />;
+}
+
+function AdminGate({ onUnlock }: { onUnlock: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState(false);
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (pw === ADMIN_PASSWORD) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, "ok");
+      onUnlock();
+    } else {
+      setError(true);
+    }
+  }
+
+  return (
+    <div className="safe-top flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="text-5xl">🔒</div>
+      <h1 className="font-display text-2xl font-extrabold">Chicken Admin</h1>
+      <p className="text-sm opacity-60">Enter the admin password.</p>
+      <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3">
+        <input
+          type="password"
+          value={pw}
+          onChange={(e) => {
+            setPw(e.target.value);
+            setError(false);
+          }}
+          placeholder="Password"
+          autoFocus
+          className="w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-3 text-center text-lg font-semibold outline-none focus:border-[var(--color-gold)]"
+        />
+        {error && (
+          <p className="text-sm font-semibold text-[var(--color-alert)]">Wrong password.</p>
+        )}
+        <button className="font-display min-h-[52px] rounded-2xl bg-[var(--color-gold)] text-lg font-extrabold uppercase text-white">
+          Unlock
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AdminPanelInner() {
   const [params, setParams] = useSearchParams();
   const code = params.get("code") ?? "";
 
@@ -363,6 +417,14 @@ function ApprovalQueue({
                     +{p.points}
                   </span>
                 </div>
+
+                {/* Evidence — watch/look before approving */}
+                {p.evidence_url ? (
+                  <Evidence url={p.evidence_url} />
+                ) : (
+                  <p className="mt-2 text-xs font-semibold opacity-50">No evidence attached.</p>
+                )}
+
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => act(p, "approve")}
@@ -385,6 +447,28 @@ function ApprovalQueue({
         </div>
       )}
     </section>
+  );
+}
+
+function Evidence({ url }: { url: string }) {
+  if (isVideoUrl(url)) {
+    return (
+      <video
+        src={url}
+        controls
+        playsInline
+        className="mt-2 max-h-64 w-full rounded-lg border-2 border-black/10 bg-black object-contain"
+      />
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer">
+      <img
+        src={url}
+        alt="evidence"
+        className="mt-2 max-h-64 w-full rounded-lg border-2 border-black/10 object-contain"
+      />
+    </a>
   );
 }
 
