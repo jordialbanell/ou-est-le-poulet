@@ -87,7 +87,7 @@ export function PlayShell() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       {/* Header */}
-      <header className="safe-top sticky top-0 z-20 flex items-center justify-between border-b border-black/10 bg-[var(--color-paper)]/90 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/10 bg-[var(--color-paper)]/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur">
         <div className="flex items-center gap-2">
           <span className="text-xl">🍗</span>
           <div>
