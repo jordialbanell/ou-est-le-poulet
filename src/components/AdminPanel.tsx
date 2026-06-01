@@ -7,15 +7,17 @@ import {
   findGameByCode,
   pushChallenge,
   rejectPending,
+  removeCompletion,
   revealChicken,
   sendMessage,
+  updateCompletionPoints,
 } from "../lib/actions";
 import { supabaseConfigured } from "../lib/supabase";
 import { isVideoUrl } from "../lib/cloudinary";
 import { computeLeaderboard } from "../lib/scoring";
-import { ZonePills, Spinner, LiveDot } from "./common";
+import { ZonePills, Spinner, LiveDot, RefreshButton } from "./common";
 import { ChatThread } from "./ChatThread";
-import type { Message, PendingChallenge, Team } from "../lib/types";
+import type { ChallengeCompletion, Message, PendingChallenge, Team } from "../lib/types";
 
 const ADMIN_PASSWORD = "Poulet2026!";
 const ADMIN_SESSION_KEY = "oelp.admin";
@@ -55,7 +57,7 @@ function AdminGate({ onUnlock }: { onUnlock: () => void }) {
             setPw(e.target.value);
             setError(false);
           }}
-          placeholder="Password"
+          placeholder="The secret cluck"
           autoFocus
           className="w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-3 text-center text-lg font-semibold outline-none focus:border-[var(--color-gold)]"
         />
@@ -159,6 +161,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
   const [pushPoints, setPushPoints] = useState(2);
   const [pushing, setPushing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 
   useEffect(() => {
     setLocation(state.game?.chicken_location ?? "");
@@ -186,7 +189,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
     try {
       await pushChallenge(gameId, pushText.trim(), pushPoints);
       setPushText("");
-      flash("Challenge pushed to all teams!");
+      flash("✅ Challenge pushed to all teams!");
     } finally {
       setPushing(false);
     }
@@ -204,7 +207,10 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
           <h1 className="font-display text-2xl font-extrabold">🍗 Chicken Admin</h1>
           <p className="text-sm opacity-60">Game #{code} · {state.teams.length} teams</p>
         </div>
-        <LiveDot connected={state.connected} />
+        <div className="flex items-center gap-3">
+          <RefreshButton onRefresh={state.refresh} label="Refresh" />
+          <LiveDot connected={state.connected} />
+        </div>
       </div>
 
       {note && (
@@ -215,6 +221,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
 
       {/* Approval queue */}
       <ApprovalQueue
+        gameId={gameId}
         pending={state.pendingChallenges}
         teams={state.teams}
         onFlash={flash}
@@ -251,7 +258,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
           <input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Molly Malone's, Zone C"
+            placeholder="The moment of truth. No pressure."
             className="min-w-0 flex-1 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] px-3 py-2"
           />
           <button
@@ -271,10 +278,13 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
       {/* Push challenge */}
       <Card title="Push a Random Challenge">
         <form onSubmit={onPush} className="flex flex-col gap-2">
+          <label className="text-xs font-bold uppercase tracking-wide opacity-60">
+            Ruin their evening with this:
+          </label>
           <textarea
             value={pushText}
             onChange={(e) => setPushText(e.target.value)}
-            placeholder="e.g. Buy the bar staff a round!"
+            placeholder="Channel your inner people-pleaser"
             rows={2}
             className="w-full resize-none rounded-xl border-2 border-black/10 bg-[var(--color-paper)] px-3 py-2"
           />
@@ -348,6 +358,24 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
                     ))}
                   </div>
                 )}
+
+                <button
+                  onClick={() =>
+                    setExpandedTeam((id) => (id === row.team.id ? null : row.team.id))
+                  }
+                  className="font-display mt-2 flex w-full items-center justify-between border-t border-black/10 pt-2 text-xs font-bold uppercase tracking-wide opacity-70"
+                >
+                  View Points
+                  <span className={`transition-transform ${expandedTeam === row.team.id ? "rotate-180" : ""}`}>⌄</span>
+                </button>
+                {expandedTeam === row.team.id && (
+                  <TeamPoints
+                    teamId={row.team.id}
+                    completions={state.completions}
+                    pending={state.pendingChallenges}
+                    onFlash={flash}
+                  />
+                )}
               </div>
             );
           })}
@@ -358,11 +386,13 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
 }
 
 function ApprovalQueue({
+  gameId,
   pending,
   teams,
   onFlash,
   onRefresh,
 }: {
+  gameId: string;
   pending: PendingChallenge[];
   teams: Team[];
   onFlash: (msg: string) => void;
@@ -373,6 +403,11 @@ function ApprovalQueue({
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
+  // Optimistically hide rows we've actioned, before Realtime catches up.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  // Submission currently showing its "reason for rejection" field.
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
 
   // Stamp "last updated" whenever the data changes (manual or realtime).
   useEffect(() => {
@@ -405,25 +440,61 @@ function ApprovalQueue({
       : `${Math.floor(secondsAgo / 60)}m ${secondsAgo % 60}s ago`;
 
   const queue = pending
-    .filter((p) => p.status === "pending")
+    .filter((p) => p.status === "pending" && !removed.has(p.id))
     .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at));
 
   const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? "Unknown team";
   const teamColor = (id: string) => teams.find((t) => t.id === id)?.color ?? "#999";
 
-  async function act(p: PendingChallenge, kind: "approve" | "reject") {
+  async function approve(p: PendingChallenge) {
     if (busy.has(p.id)) return;
     setError(null);
     setBusy((s) => new Set(s).add(p.id));
+    setRemoved((r) => new Set(r).add(p.id)); // optimistic remove
     try {
-      if (kind === "approve") {
-        await approvePending(p);
-        onFlash(`Approved "${p.challenge_name}" for ${teamName(p.team_id)} (+${p.points})`);
-      } else {
-        await rejectPending(p.id);
-        onFlash(`Rejected "${p.challenge_name}" for ${teamName(p.team_id)}`);
-      }
+      await approvePending(p);
+      onFlash(`Approved "${p.challenge_name}" for ${teamName(p.team_id)} (+${p.points})`);
     } catch (e) {
+      setRemoved((r) => {
+        const n = new Set(r);
+        n.delete(p.id);
+        return n;
+      });
+      setError(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy((s) => {
+        const n = new Set(s);
+        n.delete(p.id);
+        return n;
+      });
+    }
+  }
+
+  async function confirmReject(p: PendingChallenge) {
+    if (busy.has(p.id)) return;
+    const why = reason.trim();
+    setError(null);
+    setBusy((s) => new Set(s).add(p.id));
+    setRemoved((r) => new Set(r).add(p.id)); // optimistic remove
+    setRejectingId(null);
+    setReason("");
+    try {
+      await rejectPending(p.id, why);
+      // Tell the team why, instantly, in their chat thread.
+      await sendMessage(
+        gameId,
+        p.team_id,
+        "Chicken",
+        `❌ "${p.challenge_name}" rejected${why ? `: ${why}` : "."}`,
+        true,
+      );
+      onFlash(`Rejected "${p.challenge_name}" for ${teamName(p.team_id)}`);
+    } catch (e) {
+      setRemoved((r) => {
+        const n = new Set(r);
+        n.delete(p.id);
+        return n;
+      });
       setError(e instanceof Error ? e.message : "Action failed.");
     } finally {
       setBusy((s) => {
@@ -509,22 +580,55 @@ function ApprovalQueue({
                   <p className="mt-2 text-xs font-semibold opacity-50">No evidence attached.</p>
                 )}
 
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => act(p, "approve")}
-                    disabled={isBusy}
-                    className="font-display min-h-[44px] flex-1 rounded-xl bg-green-600 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
-                  >
-                    ✓ Approve
-                  </button>
-                  <button
-                    onClick={() => act(p, "reject")}
-                    disabled={isBusy}
-                    className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-alert)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
-                  >
-                    ✕ Reject
-                  </button>
-                </div>
+                {rejectingId === p.id ? (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <input
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value.slice(0, 200))}
+                      autoFocus
+                      placeholder="Reason for rejection?"
+                      className="w-full rounded-xl border-2 border-[var(--color-alert)]/40 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-alert)]"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setRejectingId(null);
+                          setReason("");
+                        }}
+                        className="font-display min-h-[44px] flex-1 rounded-xl border-2 border-black/15 text-sm font-bold uppercase tracking-wide transition active:scale-[0.98]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => confirmReject(p)}
+                        disabled={isBusy}
+                        className="font-display min-h-[44px] flex-[2] rounded-xl bg-[var(--color-alert)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                      >
+                        Send &amp; Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => approve(p)}
+                      disabled={isBusy}
+                      className="font-display min-h-[44px] flex-1 rounded-xl bg-green-600 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRejectingId(p.id);
+                        setReason("");
+                      }}
+                      disabled={isBusy}
+                      className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-alert)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                    >
+                      ✕ Reject
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -661,6 +765,125 @@ function AdminMessages({
   );
 }
 
+function TeamPoints({
+  teamId,
+  completions,
+  pending,
+  onFlash,
+}: {
+  teamId: string;
+  completions: ChallengeCompletion[];
+  pending: PendingChallenge[];
+  onFlash: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editVal, setEditVal] = useState(0);
+
+  const approved = completions
+    .filter((c) => c.team_id === teamId)
+    .sort((a, b) => a.completed_at.localeCompare(b.completed_at));
+  const rejected = pending
+    .filter((p) => p.team_id === teamId && p.status === "rejected")
+    .sort((a, b) => (b.reviewed_at ?? "").localeCompare(a.reviewed_at ?? ""));
+
+  function withBusy(id: string, fn: () => Promise<void>) {
+    if (busy.has(id)) return;
+    setBusy((s) => new Set(s).add(id));
+    fn()
+      .catch((e) => onFlash(e instanceof Error ? e.message : "Action failed."))
+      .finally(() =>
+        setBusy((s) => {
+          const n = new Set(s);
+          n.delete(id);
+          return n;
+        }),
+      );
+  }
+
+  async function remove(c: ChallengeCompletion) {
+    await removeCompletion(c.id);
+    onFlash(`Removed "${c.challenge_name}" (−${c.points})`);
+  }
+  async function saveEdit(c: ChallengeCompletion) {
+    await updateCompletionPoints(c.id, editVal);
+    setEditing(null);
+    onFlash(`Updated "${c.challenge_name}" to ${editVal} pts`);
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-black/10 pt-2">
+      {approved.length === 0 && rejected.length === 0 && (
+        <p className="text-xs opacity-50">No submissions yet.</p>
+      )}
+
+      {approved.map((c) => (
+        <div key={c.id} className="flex items-center gap-2 text-sm">
+          {editing === c.id ? (
+            <>
+              <input
+                type="number"
+                value={editVal}
+                onChange={(e) => setEditVal(Number(e.target.value))}
+                className="w-14 rounded-lg border-2 border-black/15 bg-white px-2 py-1 text-sm"
+              />
+              <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+              <button
+                onClick={() => withBusy(c.id, () => saveEdit(c))}
+                className="font-display rounded-lg bg-green-600 px-2 py-1 text-xs font-bold text-white"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditing(null)}
+                className="text-xs font-bold opacity-60"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="font-display w-8 shrink-0 font-extrabold text-green-700">+{c.points}</span>
+              <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+              <button
+                onClick={() => {
+                  setEditing(c.id);
+                  setEditVal(c.points);
+                }}
+                className="font-display rounded-lg border-2 border-black/15 px-2 py-1 text-xs font-bold"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => withBusy(c.id, () => remove(c))}
+                disabled={busy.has(c.id)}
+                className="font-display rounded-lg bg-[var(--color-alert)] px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+
+      {rejected.map((p) => (
+        <div key={p.id} className="flex items-start gap-2 text-sm">
+          <span className="font-display w-8 shrink-0 font-extrabold text-[var(--color-alert)]">✕</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">
+              {p.challenge_name}{" "}
+              <span className="text-xs font-bold uppercase text-[var(--color-alert)]">Rejected</span>
+            </p>
+            {p.rejection_reason && (
+              <p className="text-xs italic opacity-60">“{p.rejection_reason}”</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DrinkThumb({ url, barName }: { url: string; barName: string }) {
   return (
     <a
@@ -734,7 +957,7 @@ function CodeEntry({ onSubmit }: { onSubmit: (code: string) => void }) {
         value={c}
         onChange={(e) => setC(e.target.value.replace(/\D/g, "").slice(0, 4))}
         inputMode="numeric"
-        placeholder="Existing code"
+        placeholder="That code you wrote down"
         className="min-w-0 flex-1 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] px-3 py-2 text-center font-bold tracking-widest"
       />
       <button className="font-display rounded-xl border-2 border-black/15 px-4 py-2 font-bold">

@@ -89,6 +89,35 @@ export function LiveDot({ connected }: { connected: boolean }) {
   );
 }
 
+/** Pill refresh button used on Home + Admin. */
+export function RefreshButton({
+  onRefresh,
+  label,
+}: {
+  onRefresh: () => Promise<void> | void;
+  label: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    setBusy(true);
+    try {
+      await onRefresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button
+      onClick={go}
+      disabled={busy}
+      className="flex items-center gap-1.5 rounded-full border-2 border-black/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+    >
+      <span className={busy ? "inline-block animate-spin" : "inline-block"}>↻</span>
+      {label}
+    </button>
+  );
+}
+
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 opacity-70">

@@ -95,8 +95,11 @@ export function JoinScreen() {
             pattern="\d*"
             placeholder="0000"
             autoComplete="off"
-            className="font-display mb-4 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-4 text-center text-4xl font-bold tracking-[0.4em] outline-none transition focus:border-[var(--color-gold)]"
+            className="font-display w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-4 text-center text-4xl font-bold tracking-[0.4em] outline-none transition focus:border-[var(--color-gold)]"
           />
+          <p className="mb-4 mt-1 text-center text-xs opacity-50">
+            4 digits. Try not to lose these too.
+          </p>
 
           <label className="mb-1 block text-xs font-bold uppercase tracking-wide opacity-60">
             Team Name
@@ -104,7 +107,7 @@ export function JoinScreen() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 40))}
-            placeholder="The Cluckers"
+            placeholder="Something your mates won't regret"
             className="mb-4 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-4 text-lg font-semibold outline-none transition focus:border-[var(--color-gold)]"
           />
 
@@ -114,7 +117,7 @@ export function JoinScreen() {
           <input
             value={members}
             onChange={(e) => setMembers(e.target.value.slice(0, 200))}
-            placeholder="Alex, Sam, Jordi…"
+            placeholder="The people who showed up"
             className="mb-4 w-full rounded-2xl border-2 border-black/15 bg-[var(--color-paper)] px-4 py-3 text-base font-semibold outline-none transition focus:border-[var(--color-gold)]"
           />
 

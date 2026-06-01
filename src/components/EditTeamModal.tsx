@@ -66,7 +66,7 @@ export function EditTeamModal({
         <input
           value={members}
           onChange={(e) => setMembers(e.target.value.slice(0, 200))}
-          placeholder="Alex, Sam, Jordi…"
+          placeholder="The people who showed up"
           className="mb-4 w-full rounded-2xl border-2 border-black/15 bg-white/70 px-4 py-3 text-base font-semibold outline-none focus:border-[var(--color-gold)]"
         />
 

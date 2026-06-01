@@ -135,6 +135,7 @@ create policy "Public update" on pending_challenges for update using (true);
 alter table pending_challenges add column if not exists evidence_url text;
 alter table pending_challenges add column if not exists description text;
 alter table pending_challenges add column if not exists message_to_chicken text;
+alter table pending_challenges add column if not exists rejection_reason text;
 alter table teams add column if not exists members text;
 alter table teams add column if not exists selfie_url text;
 

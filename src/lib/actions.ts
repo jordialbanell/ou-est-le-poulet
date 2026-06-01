@@ -192,11 +192,31 @@ export async function approvePending(pending: PendingChallenge) {
   if (error) throw error;
 }
 
-export async function rejectPending(pendingId: string) {
+export async function rejectPending(pendingId: string, reason?: string | null) {
   const { error } = await supabase
     .from("pending_challenges")
-    .update({ status: "rejected", reviewed_at: new Date().toISOString() })
+    .update({
+      status: "rejected",
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: reason?.trim() || null,
+    })
     .eq("id", pendingId);
+  if (error) throw error;
+}
+
+export async function removeCompletion(completionId: string) {
+  const { error } = await supabase
+    .from("challenge_completions")
+    .delete()
+    .eq("id", completionId);
+  if (error) throw error;
+}
+
+export async function updateCompletionPoints(completionId: string, points: number) {
+  const { error } = await supabase
+    .from("challenge_completions")
+    .update({ points })
+    .eq("id", completionId);
   if (error) throw error;
 }
 

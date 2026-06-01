@@ -1,10 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { POINTS_TO_WIN } from "../lib/data";
 import { computeWinStatus, MANDATORY_DRINK_BARS } from "../lib/scoring";
-import type { BarCheckin, ChallengeCompletion, Team } from "../lib/types";
-import { PointsCounter, ProgressBar, ZonePills } from "./common";
+import type { BarCheckin, ChallengeCompletion, PendingChallenge, Team } from "../lib/types";
+import { PointsCounter, ProgressBar, RefreshButton, ZonePills } from "./common";
 import { RulesModal } from "./RulesModal";
 import { EditTeamModal } from "./EditTeamModal";
+
+function timeOf(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
 
 export function Dashboard({
   team,
@@ -13,8 +21,10 @@ export function Dashboard({
   teamColor,
   checkins,
   completions,
+  pending,
   chickenLocation,
   onRenamed,
+  onRefresh,
 }: {
   team: Team | null;
   teamId: string;
@@ -22,15 +32,38 @@ export function Dashboard({
   teamColor: string;
   checkins: BarCheckin[];
   completions: ChallengeCompletion[];
+  pending: PendingChallenge[];
   chickenLocation: string | null;
   onRenamed: (name: string) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const status = computeWinStatus(teamId, checkins, completions);
   const [showRules, setShowRules] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  const myCompletions = useMemo(
+    () =>
+      completions
+        .filter((c) => c.team_id === teamId)
+        .sort((a, b) => a.completed_at.localeCompare(b.completed_at)),
+    [completions, teamId],
+  );
+  const myRejected = useMemo(
+    () =>
+      pending
+        .filter((p) => p.team_id === teamId && p.status === "rejected")
+        .sort((a, b) => (b.reviewed_at ?? "").localeCompare(a.reviewed_at ?? "")),
+    [pending, teamId],
+  );
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
+      {/* Refresh */}
+      <div className="flex justify-end">
+        <RefreshButton onRefresh={onRefresh} label="See latest scores" />
+      </div>
+
       {/* Team header */}
       <div className="animate-rise flex items-center gap-3">
         {team?.selfie_url && (
@@ -96,6 +129,45 @@ export function Dashboard({
               : "Points target reached! 🎯"}
           </p>
         </div>
+
+        {/* Points breakdown */}
+        <button
+          onClick={() => setShowBreakdown((v) => !v)}
+          className="font-display mt-4 flex w-full items-center justify-between border-t border-black/10 pt-3 text-sm font-bold"
+        >
+          How did we earn this?
+          <span className={`transition-transform ${showBreakdown ? "rotate-180" : ""}`}>⌄</span>
+        </button>
+        {showBreakdown && (
+          <div className="mt-3 flex flex-col gap-1.5">
+            {myCompletions.length === 0 && myRejected.length === 0 && (
+              <p className="text-sm opacity-50">Nothing approved yet. Get out there.</p>
+            )}
+            {myCompletions.map((c) => (
+              <div key={c.id} className="flex items-center gap-2 text-sm">
+                <span className="font-display w-9 shrink-0 font-extrabold text-green-700">
+                  +{c.points}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
+                <span className="shrink-0 text-xs opacity-50">{timeOf(c.completed_at)}</span>
+              </div>
+            ))}
+            {myRejected.map((p) => (
+              <div key={p.id} className="flex items-start gap-2 text-sm">
+                <span className="font-display w-9 shrink-0 font-extrabold text-[var(--color-alert)]">✕</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">
+                    {p.challenge_name}{" "}
+                    <span className="text-xs font-bold uppercase text-[var(--color-alert)]">Rejected</span>
+                  </p>
+                  {p.rejection_reason && (
+                    <p className="text-xs italic opacity-60">“{p.rejection_reason}”</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Stats row */}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CHALLENGES,
   DIFFICULTY_META,
@@ -8,7 +8,7 @@ import {
 } from "../lib/data";
 import { pushChallenge, submitForApproval, updatePendingEvidence } from "../lib/actions";
 import { playChime } from "../lib/sound";
-import type { ChallengeCompletion, PendingChallenge } from "../lib/types";
+import type { ChallengeCompletion, PendingChallenge, PushedChallenge } from "../lib/types";
 import { MediaUpload } from "./MediaUpload";
 
 const FILTERS: { id: "all" | Difficulty; label: string }[] = [
@@ -36,12 +36,16 @@ export function ChallengesTab({
   teamName,
   completions,
   pending,
+  laterPushes,
+  onLaterActioned,
 }: {
   gameId: string;
   teamId: string;
   teamName: string;
   completions: ChallengeCompletion[];
   pending: PendingChallenge[];
+  laterPushes: PushedChallenge[];
+  onLaterActioned: (id: string) => void;
 }) {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -152,24 +156,7 @@ export function ChallengesTab({
             <span className="ml-1 text-sm font-bold opacity-50">pts</span>
           </div>
         </div>
-        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-0.5">
-          {FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={`font-display min-h-[36px] shrink-0 whitespace-nowrap rounded-full border-2 px-4 text-sm font-bold transition active:scale-95 ${
-                  active
-                    ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-white shadow-md shadow-[var(--color-gold)]/30"
-                    : "border-black/15 bg-white/50 text-ink"
-                }`}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
+        <FilterPills value={filter} onChange={setFilter} />
       </div>
 
       <p className="-mt-1 text-sm opacity-60">
@@ -185,6 +172,29 @@ export function ChallengesTab({
         <p className="animate-pop rounded-xl bg-green-600/15 px-4 py-2 text-sm font-semibold text-green-700">
           {pushedNote}
         </p>
+      )}
+
+      {/* Waiting: pushed challenges the team tapped "Later" on */}
+      {filter === "all" && laterPushes.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 px-1">
+            <h3 className="font-display text-lg font-bold text-[#6A1B9A]">
+              📬 Challenges from the Chicken
+            </h3>
+            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[#6A1B9A] px-1.5 text-xs font-extrabold text-white">
+              {laterPushes.length}
+            </span>
+          </div>
+          {laterPushes.map((p) => (
+            <LaterPushCard
+              key={p.id}
+              push={p}
+              gameId={gameId}
+              teamId={teamId}
+              onDone={() => onLaterActioned(p.id)}
+            />
+          ))}
+        </section>
       )}
 
       {visibleDiffs.map((diff) => {
@@ -263,13 +273,13 @@ export function ChallengesTab({
                       <input
                         value={draft.description}
                         onChange={(e) => patchDraft(ch.id, { description: e.target.value.slice(0, 280) })}
-                        placeholder="Describe what you did — e.g. We found a guy named Lionel at Molly Malone's!"
+                        placeholder="Your side of the story. Make it convincing."
                         className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
                       />
                       <input
                         value={draft.message}
                         onChange={(e) => patchDraft(ch.id, { message: e.target.value.slice(0, 280) })}
-                        placeholder="Message to the Chicken — e.g. Please be nice, this was really hard 🙏"
+                        placeholder="Beg. It sometimes works."
                         className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
                       />
                     </div>
@@ -367,4 +377,137 @@ function EvidenceIcon({ ch }: { ch: Challenge }) {
       </span>
     );
   return null;
+}
+
+/** Horizontally scrollable filter pills with a right-edge fade + chevron hint. */
+function FilterPills({
+  value,
+  onChange,
+}: {
+  value: "all" | Difficulty;
+  onChange: (v: "all" | Difficulty) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [atEnd, setAtEnd] = useState(false);
+
+  const update = () => {
+    const el = ref.current;
+    if (!el) return;
+    setScrolled(el.scrollLeft > 4);
+    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    update();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div className="relative -mx-4 mt-3">
+      <div
+        ref={ref}
+        onScroll={update}
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-4 px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {FILTERS.map((f) => {
+          const active = value === f.id;
+          return (
+            <button
+              key={f.id}
+              onClick={() => onChange(f.id)}
+              className={`font-display min-h-[36px] shrink-0 snap-start whitespace-nowrap rounded-full border-2 px-4 text-sm font-bold transition active:scale-95 ${
+                active
+                  ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-white shadow-md shadow-[var(--color-gold)]/30"
+                  : "border-black/15 bg-white/50 text-ink"
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Right-edge fade + chevron hint while more pills are off-screen */}
+      {!atEnd && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex w-14 items-center justify-end bg-gradient-to-l from-[var(--color-paper)] to-transparent pb-1 pr-1">
+          {!scrolled && <span className="font-display text-xl font-bold opacity-50">›</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A "Later" pushed challenge waiting to be actioned (evidence mandatory). */
+function LaterPushCard({
+  push,
+  gameId,
+  teamId,
+  onDone,
+}: {
+  push: PushedChallenge;
+  gameId: string;
+  teamId: string;
+  onDone: () => void;
+}) {
+  const [evidence, setEvidence] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!evidence) {
+      setError("📸 Evidence required");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await submitForApproval(gameId, teamId, {
+        challengeId: `pushed:${push.id}`,
+        challengeName: push.challenge_text,
+        points: push.points,
+        difficulty: "bonus",
+        evidenceUrl: evidence,
+      });
+      playChime();
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not submit.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border-2 border-[#6A1B9A]/40 bg-[#6A1B9A]/5 p-4">
+      <div className="flex items-start gap-3">
+        <p className="font-display min-w-0 flex-1 font-bold">{push.challenge_text}</p>
+        <span className="font-display shrink-0 rounded-xl bg-[#6A1B9A] px-2.5 py-1 text-sm font-extrabold text-white">
+          +{push.points}
+        </span>
+      </div>
+      <div className="mt-3">
+        <MediaUpload value={evidence} onUploaded={setEvidence} compact label="Add photo / video" />
+      </div>
+      {error && <p className="mt-2 text-xs font-semibold text-[var(--color-alert)]">{error}</p>}
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-gold)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+        >
+          {busy ? "Submitting…" : `Submit (+${push.points})`}
+        </button>
+        <button
+          onClick={onDone}
+          className="font-display min-h-[44px] rounded-xl border-2 border-black/15 px-4 text-sm font-bold uppercase tracking-wide transition active:scale-[0.98]"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
 }

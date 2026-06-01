@@ -78,6 +78,12 @@ export function ChatThread({
         )}
       </div>
 
+      {sending && (
+        <p className="flex items-center gap-1.5 px-4 pb-1 text-xs font-semibold opacity-60">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-black/20 border-t-[var(--color-gold)]" />
+          Sending…
+        </p>
+      )}
       {error && (
         <p className="px-4 pb-1 text-xs font-semibold text-[var(--color-alert)]">{error}</p>
       )}
@@ -86,7 +92,7 @@ export function ChatThread({
         <input
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 500))}
-          placeholder="Type a message…"
+          placeholder="Say something you'll regret tomorrow…"
           className="min-w-0 flex-1 rounded-2xl border-2 border-black/15 bg-white/70 px-4 py-2.5 text-base outline-none focus:border-[var(--color-gold)]"
         />
         <button

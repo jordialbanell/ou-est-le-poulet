@@ -280,15 +280,21 @@ export function useGame(gameId: string | null): GameState {
         setConnected(status === "SUBSCRIBED");
       });
 
-    // Fallback poll so pushed challenges + messages still arrive if the
-    // realtime socket drops or the table isn't in the publication.
+    // Fallback poll so pushed challenges still arrive if the realtime socket
+    // drops or the table isn't in the publication.
     const poll = setInterval(() => {
       void fetchPushed();
-      void fetchMessages();
     }, 12_000);
+
+    // Chat needs to feel instant — poll messages every 3s as a fast fallback
+    // alongside Realtime.
+    const chatPoll = setInterval(() => {
+      void fetchMessages();
+    }, 3_000);
 
     return () => {
       clearInterval(poll);
+      clearInterval(chatPoll);
       void supabase.removeChannel(channel);
     };
   }, [

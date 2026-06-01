@@ -4,6 +4,7 @@ import { useTeam } from "../hooks/useTeam";
 import { useGame } from "../hooks/useGame";
 import { useDarkMode } from "../hooks/useDarkMode";
 import { useGeoTracking } from "../hooks/useGeoTracking";
+import { useLaterPushes } from "../hooks/useLaterPushes";
 import { computeWinStatus } from "../lib/scoring";
 import { Dashboard } from "./Dashboard";
 import { BarsTab } from "./BarsTab";
@@ -40,6 +41,7 @@ export function PlayShell() {
   );
 
   const state = useGame(team?.gameId ?? null);
+  const laterPushes = useLaterPushes(team?.teamId ?? null);
 
   // Share this team's live GPS while playing.
   const { status: geoStatus } = useGeoTracking(
@@ -162,8 +164,10 @@ export function PlayShell() {
             teamColor={teamColor}
             checkins={state.checkins}
             completions={state.completions}
+            pending={state.pendingChallenges}
             chickenLocation={state.game?.chicken_location ?? null}
             onRenamed={(name) => setTeam({ ...team, teamName: name })}
+            onRefresh={state.refresh}
           />
         )}
         {tab === "bars" && (
@@ -176,6 +180,8 @@ export function PlayShell() {
             teamName={teamName}
             completions={state.completions}
             pending={state.pendingChallenges}
+            laterPushes={laterPushes.items}
+            onLaterActioned={laterPushes.remove}
           />
         )}
         {tab === "leaderboard" && (
@@ -223,6 +229,10 @@ export function PlayShell() {
           push={state.newPush}
           gameId={team.gameId}
           teamId={team.teamId}
+          onLater={(p) => {
+            laterPushes.add(p);
+            state.dismissPush();
+          }}
           onDismiss={state.dismissPush}
         />
       )}

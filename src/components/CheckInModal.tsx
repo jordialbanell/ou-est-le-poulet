@@ -54,7 +54,7 @@ export function CheckInModal({
         <input
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 200))}
-          placeholder="e.g. All of us — pints of Tiger!"
+          placeholder="Name your team's least reluctant drinker"
           className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2.5 text-base outline-none focus:border-[var(--color-gold)]"
         />
 
