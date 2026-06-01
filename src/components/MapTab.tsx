@@ -6,6 +6,9 @@ import { BARS, SINGAPORE_CENTER, ZONES, barPosition, type Zone } from "../lib/da
 import type { Team, TeamLocation } from "../lib/types";
 import type { GeoStatus } from "../hooks/useGeoTracking";
 
+const mapsUrl = (barName: string) =>
+  `https://www.google.com/maps/search/${encodeURIComponent(`${barName} Singapore`)}`;
+
 function barIcon(zone: Zone) {
   return L.divIcon({
     className: "",
@@ -98,6 +101,15 @@ export function MapTab({
                 <strong>{bar.name}</strong>
                 <br />
                 {ZONES[bar.zone].label}
+                <br />
+                <a
+                  href={mapsUrl(bar.name)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#1565C0", fontWeight: 600 }}
+                >
+                  Open in Google Maps →
+                </a>
               </Popup>
             </Marker>
           ))}

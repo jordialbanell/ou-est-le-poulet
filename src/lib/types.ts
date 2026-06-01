@@ -69,4 +69,6 @@ export interface PendingChallenge {
   submitted_at: string;
   reviewed_at: string | null;
   evidence_url: string | null;
+  description: string | null;
+  message_to_chicken: string | null;
 }

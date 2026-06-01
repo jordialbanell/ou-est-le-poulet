@@ -6,7 +6,7 @@ import {
   type Challenge,
   type Difficulty,
 } from "../lib/data";
-import { pushChallenge, submitForApproval } from "../lib/actions";
+import { pushChallenge, submitForApproval, updatePendingEvidence } from "../lib/actions";
 import { playChime } from "../lib/sound";
 import type { ChallengeCompletion, PendingChallenge } from "../lib/types";
 import { MediaUpload } from "./MediaUpload";
@@ -20,6 +20,13 @@ const FILTERS: { id: "all" | Difficulty; label: string }[] = [
 ];
 
 type CardStatus = "completed" | "pending" | "rejected" | "open";
+
+interface Draft {
+  evidence: string | null;
+  description: string;
+  message: string;
+}
+const EMPTY_DRAFT: Draft = { evidence: null, description: "", message: "" };
 
 const requiresEvidence = (ch: Challenge) => Boolean(ch.requiresPhoto || ch.requiresVideo);
 
@@ -40,8 +47,12 @@ export function ChallengesTab({
   const [error, setError] = useState<string | null>(null);
   const [pushedNote, setPushedNote] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | Difficulty>("all");
-  // challenge id -> uploaded evidence URL (before submission)
-  const [evidence, setEvidence] = useState<Record<string, string | null>>({});
+  // challenge id -> staged submission draft (before it's sent for approval)
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+
+  const getDraft = (id: string): Draft => drafts[id] ?? EMPTY_DRAFT;
+  const patchDraft = (id: string, patch: Partial<Draft>) =>
+    setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? EMPTY_DRAFT), ...patch } }));
 
   // "team" challenges only appear under All (no dedicated filter pill).
   const visibleDiffs = filter === "all" ? DIFFICULTY_ORDER : [filter];
@@ -82,6 +93,7 @@ export function ChallengesTab({
 
   async function submit(ch: Challenge) {
     if (busy.has(ch.id)) return;
+    const draft = getDraft(ch.id);
     setError(null);
     setBusy((s) => new Set(s).add(ch.id));
     try {
@@ -90,11 +102,13 @@ export function ChallengesTab({
         challengeName: ch.name,
         points: ch.points,
         difficulty: ch.difficulty,
-        evidenceUrl: evidence[ch.id] ?? null,
+        evidenceUrl: draft.evidence,
+        description: draft.description,
+        messageToChicken: draft.message,
       });
-      // Drop the staged evidence now that it's attached to a submission.
-      setEvidence((e) => {
-        const n = { ...e };
+      // Drop the staged draft now that it's attached to a submission.
+      setDrafts((d) => {
+        const n = { ...d };
         delete n[ch.id];
         return n;
       });
@@ -194,6 +208,8 @@ export function ChallengesTab({
               const status = statusFor(ch);
               const isBusy = busy.has(ch.id);
               const done = status === "completed";
+              const draft = getDraft(ch.id);
+              const pendingRow = myPending.get(ch.id);
               return (
                 <div
                   key={ch.id}
@@ -230,20 +246,44 @@ export function ChallengesTab({
                     </span>
                   </div>
 
-                  {/* Evidence upload — shown when the team can (re)submit */}
+                  {/* Submission form — shown when the team can (re)submit */}
                   {(status === "open" || status === "rejected") && (
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-col gap-2">
                       <MediaUpload
-                        value={evidence[ch.id] ?? null}
-                        onUploaded={(url) => setEvidence((e) => ({ ...e, [ch.id]: url }))}
+                        value={draft.evidence}
+                        onUploaded={(url) => patchDraft(ch.id, { evidence: url })}
                         compact
                         label={ch.requiresVideo ? "Add video" : "Add photo / video"}
                       />
-                      {requiresEvidence(ch) && !evidence[ch.id] && (
-                        <p className="mt-1 text-xs font-semibold text-[var(--color-alert)]">
+                      {requiresEvidence(ch) && !draft.evidence && (
+                        <p className="text-xs font-semibold text-[var(--color-alert)]">
                           {ch.requiresVideo ? "🎥 Video" : "📷 Photo"} evidence required before submitting.
                         </p>
                       )}
+                      <input
+                        value={draft.description}
+                        onChange={(e) => patchDraft(ch.id, { description: e.target.value.slice(0, 280) })}
+                        placeholder="Describe what you did — e.g. We found a guy named Lionel at Molly Malone's!"
+                        className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
+                      />
+                      <input
+                        value={draft.message}
+                        onChange={(e) => patchDraft(ch.id, { message: e.target.value.slice(0, 280) })}
+                        placeholder="Message to the Chicken — e.g. Please be nice, this was really hard 🙏"
+                        className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
+                      />
+                    </div>
+                  )}
+
+                  {/* Still pending — let them attach more evidence */}
+                  {status === "pending" && pendingRow && (
+                    <div className="mt-3">
+                      <MediaUpload
+                        value={pendingRow.evidence_url}
+                        onUploaded={(url) => void updatePendingEvidence(pendingRow.id, url)}
+                        compact
+                        label="Add more evidence"
+                      />
                     </div>
                   )}
 
@@ -252,7 +292,7 @@ export function ChallengesTab({
                       status={status}
                       points={ch.points}
                       busy={isBusy}
-                      blocked={requiresEvidence(ch) && !evidence[ch.id]}
+                      blocked={requiresEvidence(ch) && !draft.evidence}
                       onSubmit={() => submit(ch)}
                     />
                     {diff === "team" && status !== "completed" && (

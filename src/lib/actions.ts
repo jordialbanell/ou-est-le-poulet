@@ -126,6 +126,8 @@ export interface SubmissionInput {
   points: number;
   difficulty: Difficulty;
   evidenceUrl?: string | null;
+  description?: string | null;
+  messageToChicken?: string | null;
 }
 
 export async function submitForApproval(
@@ -142,7 +144,18 @@ export async function submitForApproval(
     difficulty: challenge.difficulty,
     status: "pending",
     evidence_url: challenge.evidenceUrl || null,
+    description: challenge.description?.trim() || null,
+    message_to_chicken: challenge.messageToChicken?.trim() || null,
   });
+  if (error) throw error;
+}
+
+/** Attach/replace evidence on a still-pending submission. */
+export async function updatePendingEvidence(pendingId: string, evidenceUrl: string | null) {
+  const { error } = await supabase
+    .from("pending_challenges")
+    .update({ evidence_url: evidenceUrl })
+    .eq("id", pendingId);
   if (error) throw error;
 }
 

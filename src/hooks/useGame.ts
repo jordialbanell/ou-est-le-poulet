@@ -25,6 +25,7 @@ export interface GameState {
   newPush: PushedChallenge | null;
   dismissPush: () => void;
   refresh: () => Promise<void>;
+  refreshPending: () => Promise<void>;
 }
 
 /**
@@ -269,5 +270,6 @@ export function useGame(gameId: string | null): GameState {
     newPush,
     dismissPush,
     refresh,
+    refreshPending: fetchPending,
   };
 }

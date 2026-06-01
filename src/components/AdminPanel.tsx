@@ -212,7 +212,12 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
       )}
 
       {/* Approval queue */}
-      <ApprovalQueue pending={state.pendingChallenges} teams={state.teams} onFlash={flash} />
+      <ApprovalQueue
+        pending={state.pendingChallenges}
+        teams={state.teams}
+        onFlash={flash}
+        onRefresh={state.refreshPending}
+      />
 
       {/* Share link */}
       <Card title="Join Link">
@@ -336,13 +341,48 @@ function ApprovalQueue({
   pending,
   teams,
   onFlash,
+  onRefresh,
 }: {
   pending: PendingChallenge[];
   teams: Team[];
   onFlash: (msg: string) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+
+  // Stamp "last updated" whenever the data changes (manual or realtime).
+  useEffect(() => {
+    setLastUpdated(Date.now());
+  }, [pending]);
+
+  // Tick once a second so the relative timestamp stays fresh.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function refresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await onRefresh();
+      setLastUpdated(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Refresh failed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const secondsAgo = Math.max(0, Math.round((now - lastUpdated) / 1000));
+  const agoLabel =
+    secondsAgo < 60
+      ? `${secondsAgo}s ago`
+      : `${Math.floor(secondsAgo / 60)}m ${secondsAgo % 60}s ago`;
 
   const queue = pending
     .filter((p) => p.status === "pending")
@@ -385,6 +425,15 @@ function ApprovalQueue({
             {queue.length}
           </span>
         )}
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label="Refresh queue"
+          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-black/15 text-sm transition active:scale-90 disabled:opacity-50"
+        >
+          <span className={refreshing ? "inline-block animate-spin" : "inline-block"}>↻</span>
+        </button>
+        <span className="ml-auto text-xs font-semibold opacity-50">Updated {agoLabel}</span>
       </div>
 
       {error && (
@@ -417,6 +466,21 @@ function ApprovalQueue({
                     +{p.points}
                   </span>
                 </div>
+
+                {/* What they say they did */}
+                {p.description && (
+                  <p className="mt-2 rounded-lg bg-black/5 px-2.5 py-1.5 text-sm">
+                    <span className="font-bold opacity-60">Did: </span>
+                    {p.description}
+                  </p>
+                )}
+                {/* Message to the Chicken */}
+                {p.message_to_chicken && (
+                  <p className="mt-1.5 rounded-lg bg-[var(--color-gold)]/10 px-2.5 py-1.5 text-sm italic">
+                    <span className="font-bold not-italic opacity-60">🐔 </span>
+                    {p.message_to_chicken}
+                  </p>
+                )}
 
                 {/* Evidence — watch/look before approving */}
                 {p.evidence_url ? (
