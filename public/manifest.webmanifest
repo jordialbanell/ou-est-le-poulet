@@ -1,0 +1,13 @@
+{
+  "name": "Où Est Le Poulet",
+  "short_name": "OELP 🍗",
+  "description": "Multiplayer pub crawl tracker — find the Chicken.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F0E8",
+  "theme_color": "#C8860A",
+  "icons": [
+    { "src": "/chicken.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

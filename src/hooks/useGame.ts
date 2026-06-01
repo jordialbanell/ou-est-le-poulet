@@ -1,0 +1,207 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase, supabaseConfigured } from "../lib/supabase";
+import type {
+  BarCheckin,
+  ChallengeCompletion,
+  Game,
+  PushedChallenge,
+  Team,
+} from "../lib/types";
+
+export interface GameState {
+  game: Game | null;
+  teams: Team[];
+  checkins: BarCheckin[];
+  completions: ChallengeCompletion[];
+  pushedChallenges: PushedChallenge[];
+  loading: boolean;
+  error: string | null;
+  connected: boolean;
+  /** Newest pushed challenge that arrived live and hasn't been dismissed. */
+  newPush: PushedChallenge | null;
+  dismissPush: () => void;
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Loads all data for a game and keeps it live via Supabase Realtime.
+ * On any change we refetch the affected table — simplest + most reliable for a
+ * one-night game with a handful of teams.
+ */
+export function useGame(gameId: string | null): GameState {
+  const [game, setGame] = useState<Game | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [checkins, setCheckins] = useState<BarCheckin[]>([]);
+  const [completions, setCompletions] = useState<ChallengeCompletion[]>([]);
+  const [pushedChallenges, setPushedChallenges] = useState<PushedChallenge[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [newPush, setNewPush] = useState<PushedChallenge | null>(null);
+
+  const seenPushIds = useRef<Set<string>>(new Set());
+  const initialized = useRef(false);
+
+  const fetchGame = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase.from("games").select().eq("id", gameId).maybeSingle();
+    if (data) setGame(data);
+  }, [gameId]);
+
+  const fetchTeams = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from("teams")
+      .select()
+      .eq("game_id", gameId)
+      .order("created_at", { ascending: true });
+    if (data) setTeams(data);
+  }, [gameId]);
+
+  const fetchCheckins = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase.from("bar_checkins").select().eq("game_id", gameId);
+    if (data) setCheckins(data);
+  }, [gameId]);
+
+  const fetchCompletions = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from("challenge_completions")
+      .select()
+      .eq("game_id", gameId);
+    if (data) setCompletions(data);
+  }, [gameId]);
+
+  const fetchPushed = useCallback(async () => {
+    if (!gameId) return;
+    const { data } = await supabase
+      .from("pushed_challenges")
+      .select()
+      .eq("game_id", gameId)
+      .order("pushed_at", { ascending: false });
+    if (data) {
+      setPushedChallenges(data);
+      // Record existing ones so they don't fire a toast on first load.
+      if (!initialized.current) data.forEach((p) => seenPushIds.current.add(p.id));
+    }
+  }, [gameId]);
+
+  const refresh = useCallback(async () => {
+    if (!gameId) return;
+    setError(null);
+    try {
+      await Promise.all([
+        fetchGame(),
+        fetchTeams(),
+        fetchCheckins(),
+        fetchCompletions(),
+        fetchPushed(),
+      ]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load game data.");
+    }
+  }, [gameId, fetchGame, fetchTeams, fetchCheckins, fetchCompletions, fetchPushed]);
+
+  // Initial load.
+  useEffect(() => {
+    let cancelled = false;
+    initialized.current = false;
+    setLoading(true);
+
+    if (!gameId) {
+      setLoading(false);
+      return;
+    }
+    if (!supabaseConfigured) {
+      setError("Supabase is not configured. Add your keys to .env and reload.");
+      setLoading(false);
+      return;
+    }
+
+    (async () => {
+      await refresh();
+      if (!cancelled) {
+        initialized.current = true;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, refresh]);
+
+  // Realtime subscriptions — one channel, filtered to this game.
+  useEffect(() => {
+    if (!gameId || !supabaseConfigured) return;
+
+    const channel = supabase
+      .channel(`game:${gameId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "teams", filter: `game_id=eq.${gameId}` },
+        () => void fetchTeams(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bar_checkins", filter: `game_id=eq.${gameId}` },
+        () => void fetchCheckins(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "challenge_completions",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => void fetchCompletions(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "pushed_challenges",
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          const row = payload.new as PushedChallenge;
+          if (!seenPushIds.current.has(row.id)) {
+            seenPushIds.current.add(row.id);
+            setNewPush(row);
+          }
+          void fetchPushed();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` },
+        (payload) => setGame(payload.new as Game),
+      )
+      .subscribe((status) => {
+        setConnected(status === "SUBSCRIBED");
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [gameId, fetchTeams, fetchCheckins, fetchCompletions, fetchPushed]);
+
+  const dismissPush = useCallback(() => setNewPush(null), []);
+
+  return {
+    game,
+    teams,
+    checkins,
+    completions,
+    pushedChallenges,
+    loading,
+    error,
+    connected,
+    newPush,
+    dismissPush,
+    refresh,
+  };
+}

@@ -1,0 +1,98 @@
+-- ============================================================
+--  Où Est Le Poulet — Supabase schema
+--  Run this whole file in the Supabase SQL editor (one time).
+-- ============================================================
+
+-- Games table (one per event night)
+create table if not exists games (
+  id uuid default gen_random_uuid() primary key,
+  code text unique not null,          -- 4-digit code e.g. "4269"
+  created_at timestamptz default now(),
+  is_active boolean default true,
+  chicken_location text               -- revealed by admin when ready
+);
+
+-- Teams table
+create table if not exists teams (
+  id uuid default gen_random_uuid() primary key,
+  game_id uuid references games(id) on delete cascade,
+  name text not null,
+  created_at timestamptz default now(),
+  color text not null default '#C8860A'
+);
+
+-- Bar check-ins
+create table if not exists bar_checkins (
+  id uuid default gen_random_uuid() primary key,
+  team_id uuid references teams(id) on delete cascade,
+  game_id uuid references games(id) on delete cascade,
+  bar_name text not null,
+  zone text not null,                 -- 'A', 'B', or 'C'
+  checked_in_at timestamptz default now()
+);
+
+-- Challenge completions
+create table if not exists challenge_completions (
+  id uuid default gen_random_uuid() primary key,
+  team_id uuid references teams(id) on delete cascade,
+  game_id uuid references games(id) on delete cascade,
+  challenge_name text not null,
+  points integer not null,
+  difficulty text not null,           -- 'easy','medium','hard','bonus','team'
+  completed_at timestamptz default now()
+);
+
+-- Random challenges pushed by the Chicken (admin)
+create table if not exists pushed_challenges (
+  id uuid default gen_random_uuid() primary key,
+  game_id uuid references games(id) on delete cascade,
+  challenge_text text not null,
+  points integer not null default 2,
+  pushed_at timestamptz default now(),
+  expires_at timestamptz
+);
+
+-- Enable realtime on all tables (ignore "already member" errors on re-run)
+alter publication supabase_realtime add table teams;
+alter publication supabase_realtime add table bar_checkins;
+alter publication supabase_realtime add table challenge_completions;
+alter publication supabase_realtime add table pushed_challenges;
+alter publication supabase_realtime add table games;
+
+-- RLS: allow all reads and inserts (no auth needed for this game)
+alter table games enable row level security;
+alter table teams enable row level security;
+alter table bar_checkins enable row level security;
+alter table challenge_completions enable row level security;
+alter table pushed_challenges enable row level security;
+
+drop policy if exists "Public read" on games;
+drop policy if exists "Public insert" on games;
+drop policy if exists "Public update" on games;
+create policy "Public read"   on games for select using (true);
+create policy "Public insert" on games for insert with check (true);
+create policy "Public update" on games for update using (true);
+
+drop policy if exists "Public read" on teams;
+drop policy if exists "Public insert" on teams;
+create policy "Public read"   on teams for select using (true);
+create policy "Public insert" on teams for insert with check (true);
+
+drop policy if exists "Public read" on bar_checkins;
+drop policy if exists "Public insert" on bar_checkins;
+drop policy if exists "Public delete" on bar_checkins;
+create policy "Public read"   on bar_checkins for select using (true);
+create policy "Public insert" on bar_checkins for insert with check (true);
+create policy "Public delete" on bar_checkins for delete using (true);
+
+drop policy if exists "Public read" on challenge_completions;
+drop policy if exists "Public insert" on challenge_completions;
+drop policy if exists "Public delete" on challenge_completions;
+create policy "Public read"   on challenge_completions for select using (true);
+create policy "Public insert" on challenge_completions for insert with check (true);
+create policy "Public delete" on challenge_completions for delete using (true);
+
+drop policy if exists "Public read" on pushed_challenges;
+drop policy if exists "Public insert" on pushed_challenges;
+create policy "Public read"   on pushed_challenges for select using (true);
+create policy "Public insert" on pushed_challenges for insert with check (true);
