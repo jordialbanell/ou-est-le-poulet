@@ -90,6 +90,11 @@ export function Dashboard({
             {teamName}
           </h2>
           {team?.members && <p className="truncate text-sm font-semibold opacity-60">{team.members}</p>}
+          {team?.team_code && (
+            <p className="mt-0.5 text-xs font-semibold opacity-50">
+              Team code: <span className="font-bold tracking-wider">{team.team_code}</span>
+            </p>
+          )}
         </div>
         <button
           onClick={() => setShowEdit(true)}

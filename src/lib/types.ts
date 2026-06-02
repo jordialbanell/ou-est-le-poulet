@@ -16,6 +16,8 @@ export interface Team {
   color: string;
   members: string | null;
   selfie_url: string | null;
+  /** Shareable 6-char code teammates use to join this same team. */
+  team_code: string | null;
   /** When this team last opened its chat with the Chicken. */
   last_read_at: string | null;
 }

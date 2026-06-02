@@ -40,6 +40,18 @@ export interface TeamProfile {
   selfie_url?: string | null;
 }
 
+// Unambiguous alphabet — no 0/O or 1/I so codes are easy to read aloud / type.
+const TEAM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** Generate a random 6-char shareable team code (e.g. "CLUCK4"). */
+export function makeTeamCode(): string {
+  let s = "";
+  for (let i = 0; i < 6; i++) {
+    s += TEAM_CODE_ALPHABET[Math.floor(Math.random() * TEAM_CODE_ALPHABET.length)];
+  }
+  return s;
+}
+
 export async function joinTeam(
   gameId: string,
   name: string,
@@ -47,17 +59,38 @@ export async function joinTeam(
   profile: TeamProfile = {},
 ): Promise<Team> {
   const color = TEAM_COLORS[existingTeamCount % TEAM_COLORS.length];
+  // Retry on the (rare) team_code unique collision — it's the only unique
+  // constraint on teams besides the primary key.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const { data, error } = await supabase
+      .from("teams")
+      .insert({
+        game_id: gameId,
+        name: name.trim(),
+        color,
+        members: profile.members?.trim() || null,
+        selfie_url: profile.selfie_url || null,
+        team_code: makeTeamCode(),
+      })
+      .select()
+      .single();
+    if (!error && data) return data;
+    if (error && error.code !== "23505") throw error;
+  }
+  throw new Error("Could not generate a unique team code. Try again.");
+}
+
+/** Look up a team by its shareable code within a game (case-insensitive). */
+export async function findTeamByCode(
+  gameId: string,
+  teamCode: string,
+): Promise<Team | null> {
   const { data, error } = await supabase
     .from("teams")
-    .insert({
-      game_id: gameId,
-      name: name.trim(),
-      color,
-      members: profile.members?.trim() || null,
-      selfie_url: profile.selfie_url || null,
-    })
     .select()
-    .single();
+    .eq("game_id", gameId)
+    .eq("team_code", teamCode.trim().toUpperCase())
+    .maybeSingle();
   if (error) throw error;
   return data;
 }

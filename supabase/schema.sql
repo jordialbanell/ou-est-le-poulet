@@ -59,6 +59,9 @@ create table if not exists pushed_challenges (
 -- Optional "complete by HH:MM" deadline shown as a live countdown to teams.
 alter table pushed_challenges add column if not exists deadline text;
 
+-- Shareable 6-char join code so multiple devices can join the same team.
+alter table teams add column if not exists team_code text unique;
+
 -- Challenge submissions awaiting the Chicken's approval.
 -- Teams can no longer add points directly: they submit here, the admin approves,
 -- and only then is a row written to challenge_completions.
