@@ -182,3 +182,29 @@ drop policy if exists "Public read" on messages;
 drop policy if exists "Public insert" on messages;
 create policy "Public read"   on messages for select using (true);
 create policy "Public insert" on messages for insert with check (true);
+
+-- ============================================================
+--  Persistent unread tracking (survives closing the tab)
+-- ============================================================
+
+-- When a team last read its chat with the Chicken.
+alter table teams add column if not exists last_read_at timestamptz;
+
+-- When the admin last read each team's thread.
+create table if not exists admin_read_receipts (
+  id uuid default gen_random_uuid() primary key,
+  game_id uuid references games(id) on delete cascade,
+  team_id uuid references teams(id) on delete cascade,
+  last_read_at timestamptz default now(),
+  unique(game_id, team_id)
+);
+
+alter publication supabase_realtime add table admin_read_receipts;
+
+alter table admin_read_receipts enable row level security;
+drop policy if exists "Public read" on admin_read_receipts;
+drop policy if exists "Public insert" on admin_read_receipts;
+drop policy if exists "Public update" on admin_read_receipts;
+create policy "Public read"   on admin_read_receipts for select using (true);
+create policy "Public insert" on admin_read_receipts for insert with check (true);
+create policy "Public update" on admin_read_receipts for update using (true);

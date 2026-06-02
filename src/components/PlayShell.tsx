@@ -13,8 +13,10 @@ import { LeaderboardTab } from "./LeaderboardTab";
 import { MapTab } from "./MapTab";
 import { WinBanner } from "./WinBanner";
 import { PushedChallengeToast } from "./PushedChallengeToast";
+import { AlertBanner } from "./AlertBanner";
 import { ChatModal } from "./ChatModal";
 import { LiveDot, Spinner } from "./common";
+import { markTeamRead } from "../lib/actions";
 
 type Tab = "home" | "bars" | "challenges" | "leaderboard" | "map";
 
@@ -35,12 +37,11 @@ export function PlayShell() {
   const [chatOpen, setChatOpen] = useState(false);
   const wasWinning = useRef(false);
 
-  const chatReadKey = `oelp.chatRead.${team?.teamId ?? ""}`;
-  const [chatLastRead, setChatLastRead] = useState(
-    () => localStorage.getItem(`oelp.chatRead.${team?.teamId ?? ""}`) ?? "",
-  );
+  // Local read-stamp for instant badge clearing; the durable value lives on
+  // teams.last_read_at (so unread survives closing the tab).
+  const [localChatRead, setLocalChatRead] = useState("");
 
-  const state = useGame(team?.gameId ?? null);
+  const state = useGame(team?.gameId ?? null, team?.teamId ?? null);
   const laterPushes = useLaterPushes(team?.teamId ?? null);
 
   // Share this team's live GPS while playing.
@@ -64,6 +65,11 @@ export function PlayShell() {
     ? computeWinStatus(team.teamId, state.checkins, state.completions)
     : null;
 
+  // Durable last-read comes from the team row; fall back to the local stamp so
+  // the badge clears instantly before the server round-trip lands.
+  const serverChatRead = currentTeam?.last_read_at ?? "";
+  const chatLastRead = serverChatRead > localChatRead ? serverChatRead : localChatRead;
+
   // Unread = messages from the Chicken to this team since we last opened chat.
   const unreadChat = useMemo(
     () =>
@@ -74,9 +80,8 @@ export function PlayShell() {
   );
 
   function openChat() {
-    const stamp = new Date().toISOString();
-    localStorage.setItem(chatReadKey, stamp);
-    setChatLastRead(stamp);
+    setLocalChatRead(new Date().toISOString());
+    if (team) void markTeamRead(team.teamId);
     setChatOpen(true);
   }
 
@@ -234,6 +239,19 @@ export function PlayShell() {
             state.dismissPush();
           }}
           onDismiss={state.dismissPush}
+        />
+      )}
+
+      {/* Loud score / message banner — overlays everything, any tab */}
+      {state.alert && (
+        <AlertBanner
+          key={state.alert.id}
+          alert={state.alert}
+          onDismiss={state.dismissAlert}
+          onOpenChat={() => {
+            state.dismissAlert();
+            openChat();
+          }}
         />
       )}
 

@@ -297,6 +297,26 @@ export async function sendMessage(
   }
 }
 
+/** Team opened its chat — persist the read marker so unread survives a reload. */
+export async function markTeamRead(teamId: string) {
+  const { error } = await supabase
+    .from("teams")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
+/** Admin opened a team's thread — persist their per-team read marker. */
+export async function markAdminRead(gameId: string, teamId: string) {
+  const { error } = await supabase
+    .from("admin_read_receipts")
+    .upsert(
+      { game_id: gameId, team_id: teamId, last_read_at: new Date().toISOString() },
+      { onConflict: "game_id,team_id" },
+    );
+  if (error) throw error;
+}
+
 export async function revealChicken(gameId: string, location: string) {
   const { error } = await supabase
     .from("games")

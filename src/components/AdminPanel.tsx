@@ -7,6 +7,7 @@ import {
   deductPoints,
   deductPointsFromAll,
   findGameByCode,
+  markAdminRead,
   pushChallenge,
   rejectPending,
   removeCompletion,
@@ -22,7 +23,13 @@ import { ZonePills, Spinner, LiveDot, RefreshButton } from "./common";
 import { ChatThread } from "./ChatThread";
 import { Gallery } from "./Gallery";
 import { useToast } from "./Toast";
-import type { ChallengeCompletion, Message, PendingChallenge, Team } from "../lib/types";
+import type {
+  AdminReadReceipt,
+  ChallengeCompletion,
+  Message,
+  PendingChallenge,
+  Team,
+} from "../lib/types";
 
 const ADMIN_PASSWORD = "Poulet2026!";
 const ADMIN_SESSION_KEY = "oelp.admin";
@@ -210,6 +217,8 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
 
   async function onDeduct(teamId: string, points: number, reason: string) {
     await deductPoints(gameId, teamId, points, reason);
+    // Re-fetch scores so the leaderboard + totals update instantly.
+    await state.refreshCompletions();
     const name = state.teams.find((t) => t.id === teamId)?.name ?? "team";
     toast(`−${points} from ${name}`, "success");
     setDeductTeam(null);
@@ -217,6 +226,7 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
 
   async function onDeductAll(points: number, reason: string) {
     await deductPointsFromAll(gameId, state.teams.map((t) => t.id), points, reason);
+    await state.refreshCompletions();
     toast(`−${points} from all ${state.teams.length} teams`, "success");
     setDeductAllOpen(false);
   }
@@ -243,7 +253,12 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
       />
 
       {/* Team messages */}
-      <AdminMessages gameId={gameId} teams={state.teams} messages={state.messages} />
+      <AdminMessages
+        gameId={gameId}
+        teams={state.teams}
+        messages={state.messages}
+        receipts={state.adminReadReceipts}
+      />
 
       {/* Share link */}
       <Card title="Join Link">
@@ -715,28 +730,32 @@ function AdminMessages({
   gameId,
   teams,
   messages,
+  receipts,
 }: {
   gameId: string;
   teams: Team[];
   messages: Message[];
+  receipts: AdminReadReceipt[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  // Per-team last-read stamps. Seeded from Supabase receipts (so unread
+  // survives a reload) and bumped locally the instant a thread is opened.
   const [reads, setReads] = useState<Record<string, string>>({});
 
-  // Seed last-read timestamps from localStorage for each team.
   useEffect(() => {
     setReads((prev) => {
       let changed = false;
       const next = { ...prev };
-      for (const t of teams) {
-        if (!(t.id in next)) {
-          next[t.id] = localStorage.getItem(`oelp.adminChatRead.${t.id}`) ?? "";
+      for (const r of receipts) {
+        const cur = next[r.team_id] ?? "";
+        if (r.last_read_at > cur) {
+          next[r.team_id] = r.last_read_at;
           changed = true;
         }
       }
       return changed ? next : prev;
     });
-  }, [teams]);
+  }, [receipts]);
 
   const unreadFor = (teamId: string) =>
     messages.filter(
@@ -763,8 +782,8 @@ function AdminMessages({
 
   function openThread(teamId: string) {
     const stamp = new Date().toISOString();
-    localStorage.setItem(`oelp.adminChatRead.${teamId}`, stamp);
     setReads((r) => ({ ...r, [teamId]: stamp }));
+    void markAdminRead(gameId, teamId);
     setSelected(teamId);
   }
 

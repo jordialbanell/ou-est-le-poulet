@@ -16,6 +16,15 @@ export interface Team {
   color: string;
   members: string | null;
   selfie_url: string | null;
+  /** When this team last opened its chat with the Chicken. */
+  last_read_at: string | null;
+}
+
+export interface AdminReadReceipt {
+  id: string;
+  game_id: string;
+  team_id: string;
+  last_read_at: string;
 }
 
 export interface TeamLocation {
