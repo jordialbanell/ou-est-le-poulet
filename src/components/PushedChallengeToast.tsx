@@ -3,6 +3,7 @@ import { submitForApproval } from "../lib/actions";
 import { playChime } from "../lib/sound";
 import type { PushedChallenge } from "../lib/types";
 import { MediaUpload } from "./MediaUpload";
+import { useDeadline } from "./common";
 
 export function PushedChallengeToast({
   push,
@@ -20,6 +21,7 @@ export function PushedChallengeToast({
   const [evidence, setEvidence] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const deadline = useDeadline(push.deadline);
 
   async function accept() {
     if (!evidence) {
@@ -56,7 +58,30 @@ export function PushedChallengeToast({
           </p>
         </div>
         <p className="font-display mt-3 text-xl font-bold leading-snug">{push.challenge_text}</p>
-        <p className="mt-2 font-bold text-[var(--color-gold)]">+{push.points} points</p>
+        {push.points > 0 ? (
+          <p className="mt-2 font-bold text-[var(--color-gold)]">+{push.points} points</p>
+        ) : (
+          <p className="mt-2 text-sm font-bold uppercase tracking-wide opacity-50">Announcement · no points</p>
+        )}
+
+        {push.deadline && deadline && (
+          <div
+            className={`mt-3 rounded-2xl border-2 px-3 py-2 text-center ${
+              deadline.up
+                ? "border-[var(--color-alert)] bg-[var(--color-alert)]/15"
+                : "border-[var(--color-alert)]/40 bg-[var(--color-alert)]/5"
+            }`}
+          >
+            <p className="font-display text-sm font-extrabold text-[var(--color-alert)]">
+              {deadline.up
+                ? "⏰ Time's up!"
+                : `⏰ Complete by ${push.deadline} or points will be deducted.`}
+            </p>
+            {!deadline.up && (
+              <p className="font-display mt-0.5 text-lg font-extrabold tabular-nums">{deadline.label}</p>
+            )}
+          </div>
+        )}
 
         <div className="mt-3">
           <MediaUpload value={evidence} onUploaded={setEvidence} compact label="Add photo / video" />
@@ -72,7 +97,7 @@ export function PushedChallengeToast({
             disabled={busy}
             className="font-display min-h-[48px] flex-1 rounded-2xl bg-[var(--color-gold)] text-sm font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-60"
           >
-            {busy ? "Submitting…" : `Submit (+${push.points})`}
+            {busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
           </button>
           <button
             onClick={() => onLater(push)}

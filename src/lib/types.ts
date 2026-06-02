@@ -65,6 +65,8 @@ export interface PushedChallenge {
   points: number;
   pushed_at: string;
   expires_at: string | null;
+  /** Optional "complete by" time as "HH:MM" (same-night only). */
+  deadline: string | null;
 }
 
 export type PendingStatus = "pending" | "approved" | "rejected";

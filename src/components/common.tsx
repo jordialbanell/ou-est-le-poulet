@@ -118,6 +118,49 @@ export function RefreshButton({
   );
 }
 
+/** Parse a same-night "HH:MM" deadline into today's Date (null if malformed). */
+function deadlineToDate(hhmm: string): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const d = new Date();
+  d.setHours(h, min, 0, 0);
+  return d;
+}
+
+function formatLeft(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    return `${h}h ${mins % 60}m left`;
+  }
+  if (mins >= 1) return `${mins} min${mins === 1 ? "" : "s"} left`;
+  return `${secs}s left`;
+}
+
+/**
+ * Live countdown to a same-night "HH:MM" deadline. Ticks every second.
+ * Returns `null` when there's no (valid) deadline.
+ */
+export function useDeadline(deadline: string | null): { up: boolean; label: string } | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+  if (!deadline) return null;
+  const target = deadlineToDate(deadline);
+  if (!target) return null;
+  const msLeft = target.getTime() - now;
+  const up = msLeft <= 0;
+  return { up, label: up ? "Time's up!" : formatLeft(msLeft) };
+}
+
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 opacity-70">

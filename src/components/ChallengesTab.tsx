@@ -11,6 +11,7 @@ import { playChime } from "../lib/sound";
 import type { ChallengeCompletion, PendingChallenge, PushedChallenge } from "../lib/types";
 import { MediaUpload } from "./MediaUpload";
 import { useToast } from "./Toast";
+import { useDeadline } from "./common";
 
 const FILTERS: { id: "all" | Difficulty; label: string }[] = [
   { id: "all", label: "All" },
@@ -444,6 +445,7 @@ function LaterPushCard({
   const [evidence, setEvidence] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const deadline = useDeadline(push.deadline);
 
   async function submit() {
     if (!evidence) {
@@ -469,13 +471,30 @@ function LaterPushCard({
   }
 
   return (
-    <div className="rounded-2xl border-2 border-[#6A1B9A]/40 bg-[#6A1B9A]/5 p-4">
+    <div
+      className={`rounded-2xl border-2 p-4 ${
+        deadline?.up
+          ? "border-[var(--color-alert)] bg-[var(--color-alert)]/10"
+          : "border-[#6A1B9A]/40 bg-[#6A1B9A]/5"
+      }`}
+    >
       <div className="flex items-start gap-3">
         <p className="font-display min-w-0 flex-1 font-bold">{push.challenge_text}</p>
-        <span className="font-display shrink-0 rounded-xl bg-[#6A1B9A] px-2.5 py-1 text-sm font-extrabold text-white">
-          +{push.points}
-        </span>
+        {push.points > 0 && (
+          <span className="font-display shrink-0 rounded-xl bg-[#6A1B9A] px-2.5 py-1 text-sm font-extrabold text-white">
+            +{push.points}
+          </span>
+        )}
       </div>
+      {push.deadline && deadline && (
+        <p
+          className={`font-display mt-2 text-sm font-extrabold ${
+            deadline.up ? "text-[var(--color-alert)]" : "text-[var(--color-alert)]/80"
+          }`}
+        >
+          {deadline.up ? "⏰ Time's up!" : `⏰ ${deadline.label} — complete by ${push.deadline}`}
+        </p>
+      )}
       <div className="mt-3">
         <MediaUpload value={evidence} onUploaded={setEvidence} compact label="Add photo / video" />
       </div>
@@ -486,7 +505,7 @@ function LaterPushCard({
           disabled={busy}
           className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-gold)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
         >
-          {busy ? "Submitting…" : `Submit (+${push.points})`}
+          {busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
         </button>
         <button
           onClick={onDone}

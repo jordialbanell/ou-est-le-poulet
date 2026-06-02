@@ -41,8 +41,8 @@ create table if not exists challenge_completions (
   team_id uuid references teams(id) on delete cascade,
   game_id uuid references games(id) on delete cascade,
   challenge_name text not null,
-  points integer not null,
-  difficulty text not null,           -- 'easy','medium','hard','bonus','team'
+  points integer not null,            -- negative for admin point deductions
+  difficulty text not null,           -- 'easy','medium','hard','bonus','team','deduction'
   completed_at timestamptz default now()
 );
 
@@ -55,6 +55,9 @@ create table if not exists pushed_challenges (
   pushed_at timestamptz default now(),
   expires_at timestamptz
 );
+
+-- Optional "complete by HH:MM" deadline shown as a live countdown to teams.
+alter table pushed_challenges add column if not exists deadline text;
 
 -- Challenge submissions awaiting the Chicken's approval.
 -- Teams can no longer add points directly: they submit here, the admin approves,

@@ -152,11 +152,16 @@ export function Dashboard({
             )}
             {myCompletions.map((c) => {
               const evidence = evidenceByName.get(c.challenge_name);
+              const isDeduction = c.points < 0;
               return (
                 <div key={c.id} className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-display w-9 shrink-0 font-extrabold text-green-700">
-                      +{c.points}
+                    <span
+                      className={`font-display w-9 shrink-0 font-extrabold ${
+                        isDeduction ? "text-[var(--color-alert)]" : "text-green-700"
+                      }`}
+                    >
+                      {isDeduction ? `−${Math.abs(c.points)}` : `+${c.points}`}
                     </span>
                     <span className="min-w-0 flex-1 truncate font-semibold">{c.challenge_name}</span>
                     <span className="shrink-0 text-xs opacity-50">{timeOf(c.completed_at)}</span>

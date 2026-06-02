@@ -220,15 +220,59 @@ export async function updateCompletionPoints(completionId: string, points: numbe
   if (error) throw error;
 }
 
+/**
+ * Penalise a team by writing a negative `challenge_completions` row.
+ * The reason becomes the challenge_name so it reads cleanly in the breakdown.
+ */
+export async function deductPoints(
+  gameId: string,
+  teamId: string,
+  points: number,
+  reason: string,
+) {
+  const amount = -Math.abs(points);
+  const { error } = await supabase.from("challenge_completions").insert({
+    game_id: gameId,
+    team_id: teamId,
+    challenge_name: reason.trim() || "Points deducted",
+    points: amount,
+    difficulty: "deduction",
+  });
+  if (error) throw error;
+}
+
+/** Deduct the same penalty from every team in the game at once. */
+export async function deductPointsFromAll(
+  gameId: string,
+  teamIds: string[],
+  points: number,
+  reason: string,
+) {
+  const amount = -Math.abs(points);
+  const name = reason.trim() || "Points deducted";
+  const rows = teamIds.map((teamId) => ({
+    game_id: gameId,
+    team_id: teamId,
+    challenge_name: name,
+    points: amount,
+    difficulty: "deduction",
+  }));
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("challenge_completions").insert(rows);
+  if (error) throw error;
+}
+
 export async function pushChallenge(
   gameId: string,
   challengeText: string,
   points: number,
+  deadline?: string | null,
 ) {
   const { error } = await supabase.from("pushed_challenges").insert({
     game_id: gameId,
     challenge_text: challengeText,
     points,
+    deadline: deadline?.trim() || null,
   });
   if (error) throw error;
 }
