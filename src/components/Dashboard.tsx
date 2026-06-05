@@ -73,14 +73,7 @@ export function Dashboard({
 
       {/* Team header */}
       <div className="animate-rise flex items-center gap-3">
-        {team?.selfie_url && (
-          <img
-            src={team.selfie_url}
-            alt={`${teamName} selfie`}
-            className="h-16 w-16 shrink-0 rounded-2xl border-2 object-cover"
-            style={{ borderColor: teamColor }}
-          />
-        )}
+        <TeamAvatar selfieUrl={team?.selfie_url ?? null} name={teamName} color={teamColor} />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-widest opacity-50">Your Team</p>
           <h2
@@ -230,8 +223,44 @@ export function Dashboard({
 
       {showRules && <RulesModal status={status} onClose={() => setShowRules(false)} />}
       {showEdit && team && (
-        <EditTeamModal team={team} onClose={() => setShowEdit(false)} onSaved={onRenamed} />
+        <EditTeamModal
+          team={team}
+          onClose={() => setShowEdit(false)}
+          onSaved={onRenamed}
+          onRefresh={onRefresh}
+        />
       )}
+    </div>
+  );
+}
+
+/** ~60px circular team avatar — selfie if present, else a colour disc with the initial. */
+function TeamAvatar({
+  selfieUrl,
+  name,
+  color,
+}: {
+  selfieUrl: string | null;
+  name: string;
+  color: string;
+}) {
+  if (selfieUrl) {
+    return (
+      <img
+        src={selfieUrl}
+        alt={`${name} selfie`}
+        className="h-[60px] w-[60px] shrink-0 rounded-full border-2 object-cover"
+        style={{ borderColor: color }}
+      />
+    );
+  }
+  return (
+    <div
+      className="font-display flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border-2 text-2xl font-extrabold text-white"
+      style={{ backgroundColor: color, borderColor: color }}
+      aria-label={`${name} avatar`}
+    >
+      {(name.trim()[0] ?? "?").toUpperCase()}
     </div>
   );
 }

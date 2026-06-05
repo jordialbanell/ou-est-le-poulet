@@ -7,10 +7,13 @@ export function EditTeamModal({
   team,
   onClose,
   onSaved,
+  onRefresh,
 }: {
   team: Team;
   onClose: () => void;
   onSaved: (name: string) => void;
+  /** Re-fetch game data so the new selfie/members appear immediately. */
+  onRefresh?: () => Promise<void>;
 }) {
   const [name, setName] = useState(team.name);
   const [members, setMembers] = useState(team.members ?? "");
@@ -30,6 +33,9 @@ export function EditTeamModal({
     try {
       await updateTeam(team.id, { name: cleanName, members, selfie_url: selfieUrl });
       onSaved(cleanName);
+      // Pull the saved row back into client state so the new selfie shows up
+      // right away (the update is fire-and-forget, so we don't get it back).
+      await onRefresh?.();
       onClose();
     } catch (e) {
       // Log the full error so the real cause (Supabase / Cloudinary) is visible.
