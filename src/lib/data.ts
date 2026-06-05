@@ -91,33 +91,48 @@ export const CHALLENGES: Challenge[] = [
   { id: "e5", name: "Rejected", description: "Propose to a stranger and get rejected.", points: 1, difficulty: "easy" },
   { id: "e6", name: "Shotgun", description: "Shotgun a beer.", points: 1, difficulty: "easy", requiresVideo: true },
   { id: "e7", name: "Cup Pyramid", description: "Build a pyramid of cups. Base must be 4+ cups.", points: 1, difficulty: "easy", requiresPhoto: true },
-  { id: "e8", name: "Sombrero", description: "Take a photo with a sombrero.", points: 1, difficulty: "easy", requiresPhoto: true },
+  { id: "e8", name: "Chef Hat", description: "Take a photo with a chef hat.", points: 1, difficulty: "easy", requiresPhoto: true },
   { id: "e9", name: "Digits", description: "Get a phone number from a stranger (opposite gender to the team member asking).", points: 1, difficulty: "easy" },
   { id: "e10", name: "Kick-Ups", description: "Do 30 kick-ups.", points: 1, difficulty: "easy", requiresVideo: true },
+{ id: "e11", name: "Lucky Number Deluxe", description: "Find a stranger whose phone number ends in the same 2 digits as one team member. Photo with visible matching digits on both phones.", points: 1, difficulty: "easy", requiresPhoto: true },
+  { id: "e12", name: "The Interview", description: "Conduct a post-match World Cup-style interview with a stranger. 30+ second video.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e13", name: "Full Singlish", description: "Deliver a 30-second continuous speech entirely in Singlish to a local Singaporean. Video plus confirmation from the stranger.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e14", name: "United Nations", description: "Team photo with people from multiple continents. Include nationality/continent proof.", points: 1, difficulty: "easy", requiresPhoto: true },
+  { id: "e15", name: "Boo a French Person", description: "Team publicly boos a French person in a playful, consensual way.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e16", name: "Tektonik Dance", description: "At least 3 team members perform a Tektonik dance in public.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e17", name: "Mannequin Challenge", description: "Entire team freezes for 1 full minute in public. Continuous 60-second video.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e18", name: "Fake Reunion", description: "Convince a stranger to act like they are a long-lost friend of a teammate and perform a 30-second emotional reunion.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e19", name: "90th Minute Winner", description: "Film a team celebration pretending you've scored a 90th-minute winner.", points: 1, difficulty: "easy", requiresVideo: true },
+  { id: "e20", name: "Pour Your Own", description: "Pour yourself a drink from behind a bar.", points: 1, difficulty: "easy", requiresVideo: true },
 
   // Medium — 2 points each
   { id: "m1", name: "Bullseye", description: "Hit a bullseye (inner or outer) on a dartboard. Legal throw, video required.", points: 2, difficulty: "medium", requiresVideo: true },
   { id: "m2", name: "Generous Stranger", description: "Get someone to buy your whole team tequila shots. Photo of consenting party needed.", points: 2, difficulty: "medium", requiresPhoto: true },
   { id: "m3", name: "Shoe Drink", description: "Have a drink out of your shoe. Must be substantive.", points: 2, difficulty: "medium", requiresPhoto: true },
-  { id: "m4", name: "90th Minute Winner", description: "Film a team celebration pretending you've scored a 90th-minute winner.", points: 2, difficulty: "medium", requiresVideo: true },
   { id: "m5", name: "Clothes Swap", description: "2 members of the team swap clothes for 1 hour. Must be opposite gender.", points: 2, difficulty: "medium", requiresPhoto: true },
   { id: "m6", name: "Zummi Zummi", description: "Play Zummi Zummi in a bar — loudly.", points: 2, difficulty: "medium", requiresVideo: true },
   { id: "m7", name: "Football Shirt", description: "Take a photo wearing a football shirt.", points: 2, difficulty: "medium", requiresPhoto: true },
   { id: "m8", name: "Water Gun", description: "Shoot someone with a water gun.", points: 2, difficulty: "medium", requiresPhoto: true },
-  { id: "m9", name: "Sing-Along", description: "Stand up as a team and sing a song. Get more than 2 strangers to join in.", points: 2, difficulty: "medium", requiresVideo: true },
+  { id: "m9", name: "Sing Waka Waka", description: "Stand up as a team and sing Waka Waka. Get more than 2 strangers to join in.", points: 2, difficulty: "medium", requiresVideo: true },
   { id: "m10", name: "Real Chicken", description: "Take a photo with a real chicken.", points: 2, difficulty: "medium", requiresPhoto: true },
   { id: "m11", name: "Face Paint", description: "Paint your face the colour of a World Cup nation. Chicken must guess correctly on first try.", points: 2, difficulty: "medium", requiresPhoto: true },
-  { id: "m12", name: "Pour Your Own", description: "Pour yourself a drink from behind a bar.", points: 2, difficulty: "medium", requiresVideo: true },
+{ id: "m13", name: "Human Table", description: "Convince a stranger to act as a table for a drink.", points: 2, difficulty: "medium", requiresPhoto: true },
+  { id: "m14", name: "Piggyback Pint", description: "One teammate carries another for a 50m run while holding a full pint.", points: 2, difficulty: "medium", requiresVideo: true },
+  { id: "m15", name: "Durian Dare", description: "Every team member eats durian.", points: 2, difficulty: "medium", requiresVideo: true },
+  { id: "m16", name: "Best Man Speech", description: "Deliver a 60-second wedding speech to at least 5 strangers. At least 3 strangers must applaud.", points: 2, difficulty: "medium", requiresVideo: true },
+  { id: "m17", name: "Bar Recruit", description: "Convince a bartender to join your group after their shift. Bonus +2 points if the bartender joins for a drink within 1 hour.", points: 2, difficulty: "medium", requiresVideo: true },
 
   // Hard — 3 points each
   { id: "h1", name: "The Kiss", description: "One team member must kiss a stranger (on the mouth).", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h2", name: "Boat Quay Swim", description: "Swim in Boat Quay. No need to put your head under the water.", points: 3, difficulty: "hard", requiresVideo: true },
-  { id: "h3", name: "Wannabe", description: "2 members sing Wannabe by the Spice Girls at a karaoke bar.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h4", name: "Yes!", description: "Propose to a stranger and they say yes. Video required.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h5", name: "Underwear Photo", description: "Take a photo as a team outside in your underwear. A random person must take the photo.", points: 3, difficulty: "hard", requiresPhoto: true },
   { id: "h6", name: "Split the G", description: "Split the G on a Guinness. Google it. Video required to prove it was done in 1 sip.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h7", name: "Match Maker", description: "Get 2 strangers to kiss each other.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h8", name: "Mum on FaceTime", description: "Get a stranger's mum on FaceTime with the Chicken. Figure out the logistics.", points: 3, difficulty: "hard" },
+{ id: "h9", name: "Wedding Crasher", description: "Enter a private event and stay at least 10 minutes. Video/photo inside the event.", points: 3, difficulty: "hard", requiresVideo: true },
+  { id: "h10", name: "Hawker Meal Challenge", description: "One team member must eat a full meal at a randomly chosen hawker stall.", points: 3, difficulty: "hard", requiresVideo: true },
+  { id: "h11", name: "Harlem Shake Challenge", description: "Full team performs a properly edited Harlem Shake video in public.", points: 3, difficulty: "hard", requiresVideo: true },
 
   // World Cup Nations bonus
   { id: "b1", name: "12 Nations", description: "Find people from 12 World Cup nations. Photographic evidence of their country needed.", points: 2, difficulty: "bonus", requiresPhoto: true },
@@ -127,7 +142,7 @@ export const CHALLENGES: Challenge[] = [
   // Team vs Team — tracked separately
   { id: "t1", name: "Boat Race", description: "Each team selects 3 champions with a full pint each. Relay drinking race. First team to finish all 3 wins.", points: 4, difficulty: "team" },
   { id: "t2", name: "1-on-1 Drink Race", description: "Each team picks a champion. Race to finish a pint or large cocktail (no shots!). First to finish wins.", points: 4, difficulty: "team" },
-  { id: "t3", name: "Chicken's Riddle", description: "The Chicken sends both teams an identical riddle or trivia question. First team to text the correct answer wins.", points: 4, difficulty: "team" },
+  { id: "t3", name: "Capital Challenge", description: "Nominate a champion from your team, and challenge another team to name capitals. Last man/woman/chicken/person standing wins. If you don't know anything in 5 seconds, you lose", points: 2, difficulty: "team" },
 ];
 
 export const DIFFICULTY_META: Record<
