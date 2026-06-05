@@ -22,8 +22,10 @@ export function BarsTab({
   const toast = useToast();
   const [openZones, setOpenZones] = useState<Set<Zone>>(new Set<Zone>(["A"]));
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  // Optimistic overrides: bar name -> desired checked state while a write is in flight.
-  const [override, setOverride] = useState<Record<string, boolean>>({});
+  // Optimistic overrides while a write is in flight. The value mirrors the row
+  // we're writing: `true` = approved (instant bar 7+), `"pending"` = first-6
+  // awaiting approval, `false` = checking out.
+  const [override, setOverride] = useState<Record<string, boolean | "pending">>({});
   // Bar awaiting a drink photo before its check-in completes.
   const [photoFor, setPhotoFor] = useState<{ name: string; zone: Zone } | null>(null);
 
@@ -40,13 +42,15 @@ export function BarsTab({
 
   // A pending first-6 check-in awaiting the Chicken's approval.
   const isPending = (barName: string) => {
-    const row = myCheckins.get(barName);
-    return !override[barName] && row?.status === "pending";
+    const ov = override[barName];
+    if (ov !== undefined) return ov === "pending";
+    return myCheckins.get(barName)?.status === "pending";
   };
 
   // Counts toward the zone's visited badge — approved only (pending doesn't count).
   const isVisited = (barName: string) => {
-    if (override[barName] !== undefined) return override[barName];
+    const ov = override[barName];
+    if (ov !== undefined) return ov === true;
     const row = myCheckins.get(barName);
     return !!row && row.status !== "pending";
   };
@@ -61,7 +65,14 @@ export function BarsTab({
       let changed = false;
       const next = { ...prev };
       for (const [name, want] of Object.entries(prev)) {
-        if (myCheckins.has(name) === want) {
+        const row = myCheckins.get(name);
+        const settled =
+          want === false
+            ? !row // checkout: row is gone
+            : want === "pending"
+              ? row?.status === "pending" // pending row landed
+              : !!row && row.status !== "pending"; // approved row landed
+        if (settled) {
           delete next[name];
           changed = true;
         }
@@ -79,7 +90,8 @@ export function BarsTab({
     status?: "pending" | "approved",
   ) {
     setBusy((s) => new Set(s).add(barName));
-    setOverride((o) => ({ ...o, [barName]: true }));
+    // Optimistic state must match the status we're writing.
+    setOverride((o) => ({ ...o, [barName]: status === "pending" ? "pending" : true }));
     try {
       await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note, status);
       toast(
