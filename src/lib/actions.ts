@@ -98,19 +98,16 @@ export async function findTeamByCode(
 export async function updateTeam(
   teamId: string,
   fields: { name?: string; members?: string | null; selfie_url?: string | null },
-): Promise<Team> {
+): Promise<void> {
   const patch: Record<string, string | null> = {};
   if (fields.name !== undefined) patch.name = fields.name.trim();
   if (fields.members !== undefined) patch.members = fields.members?.trim() || null;
   if (fields.selfie_url !== undefined) patch.selfie_url = fields.selfie_url || null;
-  const { data, error } = await supabase
-    .from("teams")
-    .update(patch)
-    .eq("id", teamId)
-    .select()
-    .single();
+  // Fire-and-forget: don't .select() the row back. The RLS setup blocks the
+  // returning representation (PostgREST 406), and the caller updates local
+  // state itself + Realtime broadcasts the change to everyone else.
+  const { error } = await supabase.from("teams").update(patch).eq("id", teamId);
   if (error) throw error;
-  return data;
 }
 
 /** Admin: show/hide a single team's live pin on the player + admin maps. */
