@@ -12,6 +12,63 @@ export interface UploadResult {
   resourceType: "image" | "video" | string;
 }
 
+// Anything below this is small enough that compressing isn't worth the work.
+const COMPRESS_THRESHOLD_BYTES = 500 * 1024; // 500KB
+const MAX_DIMENSION = 1200; // px on the longest side
+const JPEG_QUALITY = 0.75;
+
+/**
+ * Shrink a phone photo client-side before upload: cap the longest side at
+ * 1200px and re-encode as JPEG q0.75. A typical 3–5MB photo drops to <400KB,
+ * so uploads are far faster on bar wifi/4G.
+ *
+ * Skips videos, GIFs (canvas would flatten the animation), and already-small
+ * files. Falls back to the original file if anything goes wrong, so a quirky
+ * image can never block an upload.
+ */
+export async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file; // videos can't be compressed here
+  if (file.type === "image/gif") return file; // preserve animation
+  if (file.size < COMPRESS_THRESHOLD_BYTES) return file; // already small
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const scale = Math.min(1, MAX_DIMENSION / longest);
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
+    );
+    // If compression didn't actually help, keep the original.
+    if (!blob || blob.size >= file.size) return file;
+
+    const compressed = new File([blob], file.name, {
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    });
+    console.debug("[OELP] compressed image", {
+      name: file.name,
+      fromKB: Math.round(file.size / 1024),
+      toKB: Math.round(compressed.size / 1024),
+      dims: `${w}×${h}`,
+    });
+    return compressed;
+  } catch (e) {
+    console.warn("[OELP] image compression failed — uploading original", e);
+    return file;
+  }
+}
+
 /** Upload a photo or video to Cloudinary and return its secure URL. */
 export async function uploadToCloudinary(
   file: File,
@@ -22,19 +79,22 @@ export async function uploadToCloudinary(
     throw new Error("Cloudinary is not configured (VITE_CLOUDINARY_CLOUD_NAME missing).");
   }
 
+  // Compress images before upload (no-op for video / small files).
+  const upload = await compressImage(file);
+
   // /auto/ so the same endpoint accepts both images AND videos.
   const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", upload);
   form.append("upload_preset", UPLOAD_PRESET);
 
   console.debug("[OELP] Cloudinary upload →", {
     cloudName: CLOUD_NAME,
     uploadPreset: UPLOAD_PRESET,
     endpoint,
-    fileName: file.name,
-    fileType: file.type,
-    fileSizeKB: Math.round(file.size / 1024),
+    fileName: upload.name,
+    fileType: upload.type,
+    fileSizeKB: Math.round(upload.size / 1024),
   });
 
   // XHR (not fetch) so we can report upload progress on slow bar wifi/4G.

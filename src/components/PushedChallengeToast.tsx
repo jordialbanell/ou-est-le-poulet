@@ -20,6 +20,7 @@ export function PushedChallengeToast({
 }) {
   const [evidence, setEvidence] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deadline = useDeadline(push.deadline);
 
@@ -84,7 +85,7 @@ export function PushedChallengeToast({
         )}
 
         <div className="mt-3">
-          <MediaUpload value={evidence} onUploaded={setEvidence} compact label="Add photo / video" />
+          <MediaUpload value={evidence} onUploaded={setEvidence} onBusyChange={setUploading} compact label="Add photo / video" />
         </div>
 
         {error && (
@@ -94,10 +95,10 @@ export function PushedChallengeToast({
         <div className="mt-4 flex gap-2">
           <button
             onClick={accept}
-            disabled={busy}
+            disabled={busy || uploading}
             className="font-display min-h-[48px] flex-1 rounded-2xl bg-[var(--color-gold)] text-sm font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-60"
           >
-            {busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
+            {uploading ? "Uploading…" : busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
           </button>
           <button
             onClick={() => onLater(push)}

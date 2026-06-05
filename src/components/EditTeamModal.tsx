@@ -16,6 +16,7 @@ export function EditTeamModal({
   const [members, setMembers] = useState(team.members ?? "");
   const [selfieUrl, setSelfieUrl] = useState<string | null>(team.selfie_url);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
@@ -31,6 +32,8 @@ export function EditTeamModal({
       onSaved(cleanName);
       onClose();
     } catch (e) {
+      // Log the full error so the real cause (Supabase / Cloudinary) is visible.
+      console.error("[OELP] save team failed", e);
       setError(e instanceof Error ? e.message : "Could not save.");
       setBusy(false);
     }
@@ -77,6 +80,7 @@ export function EditTeamModal({
           <MediaUpload
             value={selfieUrl}
             onUploaded={setSelfieUrl}
+            onBusyChange={setUploading}
             accept="image/*"
             label="Take / upload selfie"
           />
@@ -88,10 +92,10 @@ export function EditTeamModal({
 
         <button
           onClick={save}
-          disabled={busy}
+          disabled={busy || uploading}
           className="font-display min-h-[52px] w-full rounded-2xl bg-[var(--color-gold)] text-lg font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-60"
         >
-          {busy ? "Saving…" : "Save changes"}
+          {uploading ? "Uploading selfie…" : busy ? "Saving…" : "Save changes"}
         </button>
       </div>
     </div>

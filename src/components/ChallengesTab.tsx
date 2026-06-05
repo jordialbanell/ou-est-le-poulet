@@ -27,6 +27,7 @@ interface Draft {
   evidence: string | null;
   description: string;
   message: string;
+  uploading?: boolean;
 }
 const EMPTY_DRAFT: Draft = { evidence: null, description: "", message: "" };
 
@@ -250,6 +251,7 @@ export function ChallengesTab({
                       <MediaUpload
                         value={draft.evidence}
                         onUploaded={(url) => patchDraft(ch.id, { evidence: url })}
+                        onBusyChange={(b) => patchDraft(ch.id, { uploading: b })}
                         compact
                         label={ch.requiresVideo ? "Add video" : "Add photo / video"}
                       />
@@ -290,6 +292,7 @@ export function ChallengesTab({
                       status={status}
                       points={ch.points}
                       busy={isBusy}
+                      uploading={!!draft.uploading}
                       blocked={requiresEvidence(ch) && !draft.evidence}
                       onSubmit={() => submit(ch)}
                     />
@@ -316,12 +319,14 @@ function SubmitButton({
   status,
   points,
   busy,
+  uploading = false,
   blocked = false,
   onSubmit,
 }: {
   status: CardStatus;
   points: number;
   busy: boolean;
+  uploading?: boolean;
   blocked?: boolean;
   onSubmit: () => void;
 }) {
@@ -343,10 +348,16 @@ function SubmitButton({
   return (
     <button
       onClick={onSubmit}
-      disabled={busy || blocked}
+      disabled={busy || uploading || blocked}
       className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-gold)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
     >
-      {busy ? "Submitting…" : status === "rejected" ? "Submit again" : "Submit for approval"}
+      {uploading
+        ? "Uploading…"
+        : busy
+          ? "Submitting…"
+          : status === "rejected"
+            ? "Submit again"
+            : "Submit for approval"}
     </button>
   );
 }
@@ -444,6 +455,7 @@ function LaterPushCard({
 }) {
   const [evidence, setEvidence] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deadline = useDeadline(push.deadline);
 
@@ -496,16 +508,16 @@ function LaterPushCard({
         </p>
       )}
       <div className="mt-3">
-        <MediaUpload value={evidence} onUploaded={setEvidence} compact label="Add photo / video" />
+        <MediaUpload value={evidence} onUploaded={setEvidence} onBusyChange={setUploading} compact label="Add photo / video" />
       </div>
       {error && <p className="mt-2 text-xs font-semibold text-[var(--color-alert)]">{error}</p>}
       <div className="mt-3 flex gap-2">
         <button
           onClick={submit}
-          disabled={busy}
+          disabled={busy || uploading}
           className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-gold)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
         >
-          {busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
+          {uploading ? "Uploading…" : busy ? "Submitting…" : push.points > 0 ? `Submit (+${push.points})` : "Submit"}
         </button>
         <button
           onClick={onDone}

@@ -16,6 +16,7 @@ export function CheckInModal({
   const [evidence, setEvidence] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function confirm() {
@@ -43,6 +44,7 @@ export function CheckInModal({
           <MediaUpload
             value={evidence}
             onUploaded={setEvidence}
+            onBusyChange={setUploading}
             accept="image/*,video/*"
             label="Add drink photo / video"
           />
@@ -70,10 +72,10 @@ export function CheckInModal({
           </button>
           <button
             onClick={confirm}
-            disabled={!evidence || busy}
+            disabled={!evidence || busy || uploading}
             className="font-display min-h-[52px] flex-[2] rounded-2xl bg-[var(--color-gold)] text-base font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
           >
-            {busy ? "Checking in…" : "Check In"}
+            {uploading ? "Uploading…" : busy ? "Checking in…" : "Check In"}
           </button>
         </div>
       </div>

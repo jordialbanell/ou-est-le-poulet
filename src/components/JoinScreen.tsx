@@ -31,6 +31,7 @@ export function JoinScreen() {
   const [foundGame, setFoundGame] = useState<Game | null>(null);
 
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const gameCodeValid = /^\d{4}$/.test(code.trim());
@@ -224,6 +225,7 @@ export function JoinScreen() {
                 <MediaUpload
                   value={selfieUrl}
                   onUploaded={setSelfieUrl}
+                  onBusyChange={setUploading}
                   accept="image/*"
                   label="Take / upload selfie"
                 />
@@ -233,10 +235,10 @@ export function JoinScreen() {
 
               <button
                 type="submit"
-                disabled={busy}
+                disabled={busy || uploading}
                 className="font-display min-h-[56px] w-full rounded-2xl bg-[var(--color-gold)] text-lg font-extrabold uppercase tracking-wide text-white shadow-lg shadow-[var(--color-gold)]/30 transition active:scale-[0.98] disabled:opacity-60"
               >
-                {busy ? "Creating…" : "Create Team"}
+                {uploading ? "Uploading selfie…" : busy ? "Creating…" : "Create Team"}
               </button>
             </form>
           )}
