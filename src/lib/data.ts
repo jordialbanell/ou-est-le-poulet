@@ -131,7 +131,7 @@ export const CHALLENGES: Challenge[] = [
   { id: "h7", name: "Match Maker", description: "Get 2 strangers to kiss each other.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h8", name: "Mum on FaceTime", description: "Get a stranger's mum on FaceTime with the Chicken. Figure out the logistics.", points: 3, difficulty: "hard" },
 { id: "h9", name: "Wedding Crasher", description: "Enter a private event and stay at least 10 minutes. Video/photo inside the event.", points: 3, difficulty: "hard", requiresVideo: true },
-  { id: "h10", name: "Hawker Meal Challenge", description: "One team member must eat a full meal at a randomly chosen hawker stall.", points: 3, difficulty: "hard", requiresVideo: true },
+  { id: "h10", name: "Hawker Meal Challenge", description: "One team member must prepare a full meal at a randomly chosen hawker stall.", points: 3, difficulty: "hard", requiresVideo: true },
   { id: "h11", name: "Harlem Shake Challenge", description: "Full team performs a properly edited Harlem Shake video in public.", points: 3, difficulty: "hard", requiresVideo: true },
 
   // World Cup Nations bonus
