@@ -59,6 +59,12 @@ export interface BarCheckin {
   checked_in_at: string;
   checkin_evidence_url: string | null;
   checkin_note: string | null;
+  /**
+   * 'approved' (counts immediately) or 'pending' (first-6 photo check-in
+   * awaiting the Chicken's approval). Legacy rows may be null → treated as
+   * approved everywhere via `status !== 'pending'`.
+   */
+  status: "pending" | "approved" | null;
 }
 
 export interface ChallengeCompletion {

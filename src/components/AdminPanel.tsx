@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useGame } from "../hooks/useGame";
 import {
+  approveBarCheckin,
   approvePending,
   createGame,
   deductPoints,
@@ -9,6 +10,7 @@ import {
   findGameByCode,
   markAdminRead,
   pushChallenge,
+  rejectBarCheckin,
   rejectPending,
   removeCompletion,
   revealChicken,
@@ -26,6 +28,7 @@ import { Gallery } from "./Gallery";
 import { useToast } from "./Toast";
 import type {
   AdminReadReceipt,
+  BarCheckin,
   ChallengeCompletion,
   Message,
   PendingChallenge,
@@ -251,6 +254,13 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         pending={state.pendingChallenges}
         teams={state.teams}
         onRefresh={state.refreshPending}
+      />
+
+      {/* First-6 bar check-in approval queue */}
+      <BarApprovalQueue
+        checkins={state.checkins}
+        teams={state.teams}
+        onRefresh={state.refreshCheckins}
       />
 
       {/* Team messages */}
@@ -725,6 +735,195 @@ function ApprovalQueue({
                     </button>
                   </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Approval queue for the first-6 photo bar check-ins. Mirrors ApprovalQueue:
+ * optimistic remove, live via the existing bar_checkins subscription. Approve
+ * flips status → 'approved' (counts instantly on the player side); reject
+ * deletes the row.
+ */
+function BarApprovalQueue({
+  checkins,
+  teams,
+  onRefresh,
+}: {
+  checkins: BarCheckin[];
+  teams: Team[];
+  onRefresh: () => Promise<void>;
+}) {
+  const toast = useToast();
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  // Optimistically hide rows we've actioned, before Realtime catches up.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLastUpdated(Date.now());
+  }, [checkins]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      setLastUpdated(Date.now());
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Refresh failed.", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const secondsAgo = Math.max(0, Math.round((now - lastUpdated) / 1000));
+  const agoLabel =
+    secondsAgo < 60
+      ? `${secondsAgo}s ago`
+      : `${Math.floor(secondsAgo / 60)}m ${secondsAgo % 60}s ago`;
+
+  const queue = checkins
+    .filter((c) => c.status === "pending" && !removed.has(c.id))
+    .sort((a, b) => a.checked_in_at.localeCompare(b.checked_in_at));
+
+  const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? "Unknown team";
+  const teamColor = (id: string) => teams.find((t) => t.id === id)?.color ?? "#999";
+
+  async function approve(c: BarCheckin) {
+    if (busy.has(c.id)) return;
+    setBusy((s) => new Set(s).add(c.id));
+    setRemoved((r) => new Set(r).add(c.id)); // optimistic remove
+    try {
+      await approveBarCheckin(c.id);
+      toast(`Approved check-in at ${c.bar_name}`, "success");
+    } catch (e) {
+      setRemoved((r) => {
+        const n = new Set(r);
+        n.delete(c.id);
+        return n;
+      });
+      toast(e instanceof Error ? e.message : "Action failed.", "error");
+    } finally {
+      setBusy((s) => {
+        const n = new Set(s);
+        n.delete(c.id);
+        return n;
+      });
+    }
+  }
+
+  async function reject(c: BarCheckin) {
+    if (busy.has(c.id)) return;
+    setBusy((s) => new Set(s).add(c.id));
+    setRemoved((r) => new Set(r).add(c.id)); // optimistic remove
+    try {
+      await rejectBarCheckin(c.id);
+      toast(`Rejected check-in at ${c.bar_name}`, "success");
+    } catch (e) {
+      setRemoved((r) => {
+        const n = new Set(r);
+        n.delete(c.id);
+        return n;
+      });
+      toast(e instanceof Error ? e.message : "Action failed.", "error");
+    } finally {
+      setBusy((s) => {
+        const n = new Set(s);
+        n.delete(c.id);
+        return n;
+      });
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border-2 border-[var(--color-gold)]/60 bg-[var(--color-gold)]/5 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="font-display text-sm font-bold uppercase tracking-widest text-[var(--color-gold)]">
+          Bar Check-in Queue
+        </h2>
+        {queue.length > 0 && (
+          <span className="font-display flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--color-gold)] px-1.5 text-xs font-extrabold text-white">
+            {queue.length}
+          </span>
+        )}
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label="Refresh queue"
+          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-black/15 text-sm transition active:scale-90 disabled:opacity-50"
+        >
+          <span className={refreshing ? "inline-block animate-spin" : "inline-block"}>↻</span>
+        </button>
+        <span className="ml-auto text-xs font-semibold opacity-50">Updated {agoLabel}</span>
+      </div>
+
+      {queue.length === 0 ? (
+        <p className="text-sm opacity-60">No check-ins waiting. 🍺</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {queue.map((c) => {
+            const isBusy = busy.has(c.id);
+            return (
+              <div
+                key={c.id}
+                className="rounded-xl border-2 border-black/10 bg-[var(--color-paper)] p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: teamColor(c.team_id) }}
+                      />
+                      <p className="font-display truncate font-bold">{teamName(c.team_id)}</p>
+                    </div>
+                    <p className="mt-1 text-sm leading-snug">
+                      🍺 {c.bar_name}
+                      {c.checkin_note && (
+                        <span className="opacity-60"> · {c.checkin_note}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="font-display shrink-0 rounded-lg bg-[var(--color-gold)] px-2 py-0.5 text-xs font-extrabold uppercase text-white">
+                    Zone {c.zone}
+                  </span>
+                </div>
+
+                {/* Drink photo — look before approving */}
+                {c.checkin_evidence_url ? (
+                  <Evidence url={c.checkin_evidence_url} />
+                ) : (
+                  <p className="mt-2 text-xs font-semibold opacity-50">No photo attached.</p>
+                )}
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => approve(c)}
+                    disabled={isBusy}
+                    className="font-display min-h-[44px] flex-1 rounded-xl bg-green-600 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    ✓ Approve
+                  </button>
+                  <button
+                    onClick={() => reject(c)}
+                    disabled={isBusy}
+                    className="font-display min-h-[44px] flex-1 rounded-xl bg-[var(--color-alert)] text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    ✕ Reject
+                  </button>
+                </div>
               </div>
             );
           })}

@@ -219,3 +219,13 @@ create policy "Public update" on admin_read_receipts for update using (true);
 -- When false, a team's live pin is hidden from BOTH the player-facing map
 -- (other teams can't see them) and the admin map. Default true (visible).
 alter table teams add column if not exists location_visible boolean default true;
+
+-- ============================================================
+--  First-6 bar check-ins require admin approval
+-- ============================================================
+
+-- 'approved' = counts immediately (existing rows + instant bar 7+ check-ins).
+-- The app writes 'pending' explicitly only for the first-6 photo check-ins.
+-- DEFAULT 'approved' backfills all existing rows so current progress isn't lost.
+alter table bar_checkins
+  add column if not exists status text not null default 'approved';

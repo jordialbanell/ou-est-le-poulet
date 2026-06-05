@@ -34,10 +34,25 @@ export function BarsTab({
     return map;
   }, [checkins, teamId]);
 
-  // Effective checked state = optimistic override if present, else server truth.
+  // Effective checked state (any status) = optimistic override if present, else
+  // server truth. Used for the photo gate, checkout, and sorting.
   const isChecked = (barName: string) => override[barName] ?? myCheckins.has(barName);
 
-  // How many bars this team has checked into so far (effective, optimistic-aware).
+  // A pending first-6 check-in awaiting the Chicken's approval.
+  const isPending = (barName: string) => {
+    const row = myCheckins.get(barName);
+    return !override[barName] && row?.status === "pending";
+  };
+
+  // Counts toward the zone's visited badge — approved only (pending doesn't count).
+  const isVisited = (barName: string) => {
+    if (override[barName] !== undefined) return override[barName];
+    const row = myCheckins.get(barName);
+    return !!row && row.status !== "pending";
+  };
+
+  // How many bars this team has checked into so far (any status) — keeps the
+  // "first 6 require a photo" gate stable even while approvals are pending.
   const checkedCount = BARS.filter((b) => isChecked(b.name)).length;
 
   // Once the server (via realtime) agrees with an override, drop the override.
@@ -56,12 +71,23 @@ export function BarsTab({
   }, [myCheckins]);
 
   /** Optimistically check in (with optional drink evidence) and persist. */
-  async function doCheckIn(barName: string, zone: Zone, evidenceUrl?: string, note?: string) {
+  async function doCheckIn(
+    barName: string,
+    zone: Zone,
+    evidenceUrl?: string,
+    note?: string,
+    status?: "pending" | "approved",
+  ) {
     setBusy((s) => new Set(s).add(barName));
     setOverride((o) => ({ ...o, [barName]: true }));
     try {
-      await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note);
-      toast(`Checked in at ${barName} 🍺`, "success");
+      await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note, status);
+      toast(
+        status === "pending"
+          ? `Sent to the Chicken for approval 🍺`
+          : `Checked in at ${barName} 🍺`,
+        "success",
+      );
     } catch (e) {
       setOverride((o) => ({ ...o, [barName]: false }));
       toast(e instanceof Error ? e.message : "Check-in failed.", "error");
@@ -114,7 +140,7 @@ export function BarsTab({
 
       {ZONE_ORDER.map((zone) => {
         const zoneBars = BARS.filter((b) => b.zone === zone);
-        const visitedCount = zoneBars.filter((b) => isChecked(b.name)).length;
+        const visitedCount = zoneBars.filter((b) => isVisited(b.name)).length;
         const open = openZones.has(zone);
         // Visited bars sink to the bottom.
         const sorted = [...zoneBars].sort((a, b) => {
@@ -165,6 +191,7 @@ export function BarsTab({
               <ul className="border-t border-black/10">
                 {sorted.map((bar) => {
                   const checked = isChecked(bar.name);
+                  const pending = isPending(bar.name);
                   const isBusy = busy.has(bar.name);
                   return (
                     <li key={bar.name} className="flex items-stretch border-b border-black/5">
@@ -175,18 +202,29 @@ export function BarsTab({
                       >
                         <span
                           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold transition ${
-                            checked
-                              ? "border-transparent text-white"
-                              : "border-black/25 text-transparent"
+                            pending
+                              ? "border-[var(--color-gold)] text-[var(--color-gold)]"
+                              : checked
+                                ? "border-transparent text-white"
+                                : "border-black/25 text-transparent"
                           }`}
-                          style={checked ? { backgroundColor: ZONES[zone].color } : undefined}
+                          style={checked && !pending ? { backgroundColor: ZONES[zone].color } : undefined}
                         >
-                          ✓
+                          {pending ? "⏳" : "✓"}
                         </span>
-                        <span
-                          className={`font-semibold ${checked ? "line-through opacity-50" : ""}`}
-                        >
-                          {bar.name}
+                        <span className="min-w-0">
+                          <span
+                            className={`font-semibold ${
+                              checked && !pending ? "line-through opacity-50" : ""
+                            }`}
+                          >
+                            {bar.name}
+                          </span>
+                          {pending && (
+                            <span className="font-display ml-2 rounded-full bg-[var(--color-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-gold)]">
+                              ⏳ Pending approval
+                            </span>
+                          )}
                         </span>
                       </button>
                       <a
@@ -213,7 +251,8 @@ export function BarsTab({
           barNumber={checkedCount + 1}
           onCancel={() => setPhotoFor(null)}
           onConfirm={async (evidenceUrl, note) => {
-            await doCheckIn(photoFor.name, photoFor.zone, evidenceUrl, note);
+            // First-6 photo check-ins require the Chicken's approval.
+            await doCheckIn(photoFor.name, photoFor.zone, evidenceUrl, note, "pending");
             setPhotoFor(null);
           }}
         />

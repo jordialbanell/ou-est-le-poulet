@@ -136,17 +136,22 @@ export async function checkInBar(
   zone: Zone,
   evidenceUrl?: string | null,
   note?: string | null,
+  // First-6 photo check-ins pass "pending" (await Chicken approval). Bar 7+
+  // omit this → the column default ('approved') keeps them instant.
+  status?: "pending" | "approved",
 ) {
+  const row: Record<string, unknown> = {
+    game_id: gameId,
+    team_id: teamId,
+    bar_name: barName,
+    zone,
+    checkin_evidence_url: evidenceUrl || null,
+    checkin_note: note?.trim() || null,
+  };
+  if (status) row.status = status;
   const { data, error } = await supabase
     .from("bar_checkins")
-    .insert({
-      game_id: gameId,
-      team_id: teamId,
-      bar_name: barName,
-      zone,
-      checkin_evidence_url: evidenceUrl || null,
-      checkin_note: note?.trim() || null,
-    })
+    .insert(row)
     .select()
     .single();
   if (error) {
@@ -164,6 +169,20 @@ export async function undoCheckIn(checkinId: string) {
     throw new Error(error.message || "Could not undo check-in.");
   }
   console.debug("[OELP] undid check-in", checkinId);
+}
+
+/** Admin: approve a pending first-6 photo check-in so it counts. */
+export async function approveBarCheckin(checkinId: string) {
+  const { error } = await supabase
+    .from("bar_checkins")
+    .update({ status: "approved" })
+    .eq("id", checkinId);
+  if (error) throw error;
+}
+
+/** Admin: reject a pending check-in — removes the row (mirrors undo). */
+export async function rejectBarCheckin(checkinId: string) {
+  await undoCheckIn(checkinId);
 }
 
 export async function completeChallenge(

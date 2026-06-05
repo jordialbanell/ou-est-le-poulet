@@ -19,7 +19,11 @@ export function computeWinStatus(
   checkins: BarCheckin[],
   completions: ChallengeCompletion[],
 ): WinStatus {
-  const teamCheckins = checkins.filter((c) => c.team_id === teamId);
+  // Pending (unapproved) first-6 photo check-ins don't count yet. `!== "pending"`
+  // keeps legacy/null rows and instant bar 7+ check-ins counting as before.
+  const teamCheckins = checkins.filter(
+    (c) => c.team_id === teamId && c.status !== "pending",
+  );
   const teamCompletions = completions.filter((c) => c.team_id === teamId);
 
   const zonesVisited = new Set<Zone>(teamCheckins.map((c) => c.zone));
