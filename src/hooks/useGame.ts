@@ -256,6 +256,24 @@ export function useGame(gameId: string | null, notifyTeamId?: string | null): Ga
     fetchReceipts,
   ]);
 
+  // If a check-in or submission references a team we haven't loaded yet (e.g. a
+  // team that just joined and whose teams-realtime INSERT we missed), pull teams
+  // once so the gallery + approval queues resolve its name instead of "Unknown".
+  const triedMissingTeams = useRef("");
+  useEffect(() => {
+    const known = new Set(teams.map((t) => t.id));
+    const missing = new Set<string>();
+    for (const c of checkins) if (c.team_id && !known.has(c.team_id)) missing.add(c.team_id);
+    for (const p of pendingChallenges)
+      if (p.team_id && !known.has(p.team_id)) missing.add(p.team_id);
+    if (missing.size === 0) return;
+    // Only refetch once per distinct gap — never loops if a team stays absent.
+    const key = [...missing].sort().join(",");
+    if (key === triedMissingTeams.current) return;
+    triedMissingTeams.current = key;
+    void fetchTeams();
+  }, [checkins, pendingChallenges, teams, fetchTeams]);
+
   // Initial load.
   useEffect(() => {
     let cancelled = false;
