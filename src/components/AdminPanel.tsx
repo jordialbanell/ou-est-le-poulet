@@ -688,10 +688,13 @@ function ApprovalQueue({
                 )}
 
                 {/* Evidence — watch/look before approving */}
+                {p.whatsapp_evidence && <WhatsAppEvidenceBadge />}
                 {p.evidence_url ? (
                   <Evidence url={p.evidence_url} />
                 ) : (
-                  <p className="mt-2 text-xs font-semibold opacity-50">No evidence attached.</p>
+                  !p.whatsapp_evidence && (
+                    <p className="mt-2 text-xs font-semibold opacity-50">No evidence attached.</p>
+                  )
                 )}
 
                 {rejectingId === p.id ? (
@@ -910,10 +913,13 @@ function BarApprovalQueue({
                 </div>
 
                 {/* Drink photo — look before approving */}
+                {c.whatsapp_evidence && <WhatsAppEvidenceBadge />}
                 {c.checkin_evidence_url ? (
                   <Evidence url={c.checkin_evidence_url} />
                 ) : (
-                  <p className="mt-2 text-xs font-semibold opacity-50">No photo attached.</p>
+                  !c.whatsapp_evidence && (
+                    <p className="mt-2 text-xs font-semibold opacity-50">No photo attached.</p>
+                  )
                 )}
 
                 <div className="mt-3 flex gap-2">
@@ -1246,6 +1252,16 @@ function DrinkThumb({ url, barName }: { url: string; barName: string }) {
         <img src={url} alt={barName} className="h-14 w-14 rounded-lg border-2 border-black/10 object-cover" />
       )}
     </a>
+  );
+}
+
+/** Shown in place of the photo when a team submitted evidence over WhatsApp. */
+function WhatsAppEvidenceBadge() {
+  return (
+    <div className="mt-2 flex items-center gap-2 rounded-lg border-2 border-dashed border-[var(--color-gold)]/60 bg-[var(--color-gold)]/10 px-3 py-2.5 text-sm font-bold text-[var(--color-gold)]">
+      📲 Evidence on WhatsApp
+      <span className="font-normal opacity-70">— check WhatsApp before approving</span>
+    </div>
   );
 }
 

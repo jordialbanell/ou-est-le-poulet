@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BARS, ZONE_ORDER, ZONES, type Zone } from "../lib/data";
+import { BARS, ZONE_ORDER, ZONES, type Bar, type Zone } from "../lib/data";
 import { checkInBar, undoCheckIn } from "../lib/actions";
 import type { BarCheckin } from "../lib/types";
 import { CheckInModal } from "./CheckInModal";
@@ -21,6 +21,7 @@ export function BarsTab({
 }) {
   const toast = useToast();
   const [openZones, setOpenZones] = useState<Set<Zone>>(new Set<Zone>(["A"]));
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<Set<string>>(new Set());
   // Optimistic overrides while a write is in flight. The value mirrors the row
   // we're writing: `true` = approved (instant bar 7+), `"pending"` = first-6
@@ -59,6 +60,11 @@ export function BarsTab({
   // "first 6 require a photo" gate stable even while approvals are pending.
   const checkedCount = BARS.filter((b) => isChecked(b.name)).length;
 
+  // Active search query (case-insensitive substring on bar name). When set, the
+  // zone grouping is flattened into a single matching list.
+  const q = query.trim().toLowerCase();
+  const matches = q ? BARS.filter((b) => b.name.toLowerCase().includes(q)) : [];
+
   // Once the server (via realtime) agrees with an override, drop the override.
   useEffect(() => {
     setOverride((prev) => {
@@ -85,15 +91,16 @@ export function BarsTab({
   async function doCheckIn(
     barName: string,
     zone: Zone,
-    evidenceUrl?: string,
+    evidenceUrl?: string | null,
     note?: string,
     status?: "pending" | "approved",
+    whatsappEvidence?: boolean,
   ) {
     setBusy((s) => new Set(s).add(barName));
     // Optimistic state must match the status we're writing.
     setOverride((o) => ({ ...o, [barName]: status === "pending" ? "pending" : true }));
     try {
-      await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note, status);
+      await checkInBar(gameId, teamId, barName, zone, evidenceUrl, note, status, whatsappEvidence);
       toast(
         status === "pending"
           ? `Sent to the Chicken for approval 🍺`
@@ -150,7 +157,48 @@ export function BarsTab({
       <h2 className="font-display text-2xl font-extrabold">Bars</h2>
       <p className="-mt-1 text-sm opacity-60">Check in everywhere you drink. One in each zone to win.</p>
 
-      {ZONE_ORDER.map((zone) => {
+      {/* Search — filters across all zones; clearing restores the grouped view. */}
+      <div className="relative">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search bars by name…"
+          className="w-full rounded-xl border-2 border-black/15 bg-white/70 py-2 pl-3 pr-9 text-sm outline-none focus:border-[var(--color-gold)]"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-lg opacity-50 transition active:scale-90"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {q ? (
+        // Active search — flat list across every zone, each tagged with its zone.
+        matches.length === 0 ? (
+          <p className="py-6 text-center text-sm opacity-60">No bars match “{query.trim()}”.</p>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border-2 border-black/10 bg-white/50">
+            <ul>
+              {matches.map((bar) => (
+                <BarRow
+                  key={bar.name}
+                  bar={bar}
+                  checked={!!isChecked(bar.name)}
+                  pending={isPending(bar.name)}
+                  isBusy={busy.has(bar.name)}
+                  onToggle={() => toggle(bar.name, bar.zone)}
+                  showZone
+                />
+              ))}
+            </ul>
+          </div>
+        )
+      ) : (
+        ZONE_ORDER.map((zone) => {
         const zoneBars = BARS.filter((b) => b.zone === zone);
         const visitedCount = zoneBars.filter((b) => isVisited(b.name)).length;
         const open = openZones.has(zone);
@@ -201,74 +249,116 @@ export function BarsTab({
 
             {open && (
               <ul className="border-t border-black/10">
-                {sorted.map((bar) => {
-                  const checked = isChecked(bar.name);
-                  const pending = isPending(bar.name);
-                  const isBusy = busy.has(bar.name);
-                  return (
-                    <li key={bar.name} className="flex items-stretch border-b border-black/5">
-                      <button
-                        onClick={() => toggle(bar.name, zone)}
-                        disabled={isBusy}
-                        className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition active:bg-black/5 disabled:opacity-50"
-                      >
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold transition ${
-                            pending
-                              ? "border-[var(--color-gold)] text-[var(--color-gold)]"
-                              : checked
-                                ? "border-transparent text-white"
-                                : "border-black/25 text-transparent"
-                          }`}
-                          style={checked && !pending ? { backgroundColor: ZONES[zone].color } : undefined}
-                        >
-                          {pending ? "⏳" : "✓"}
-                        </span>
-                        <span className="min-w-0">
-                          <span
-                            className={`font-semibold ${
-                              checked && !pending ? "line-through opacity-50" : ""
-                            }`}
-                          >
-                            {bar.name}
-                          </span>
-                          {pending && (
-                            <span className="font-display ml-2 rounded-full bg-[var(--color-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-gold)]">
-                              ⏳ Pending approval
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                      <a
-                        href={mapsUrl(bar.name)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open ${bar.name} in Google Maps`}
-                        className="flex min-h-[56px] shrink-0 items-center gap-1 border-l border-black/5 px-3 text-xs font-bold text-[var(--color-zone-a)] transition active:bg-black/5"
-                      >
-                        📍 Map
-                      </a>
-                    </li>
-                  );
-                })}
+                {sorted.map((bar) => (
+                  <BarRow
+                    key={bar.name}
+                    bar={bar}
+                    checked={!!isChecked(bar.name)}
+                    pending={isPending(bar.name)}
+                    isBusy={busy.has(bar.name)}
+                    onToggle={() => toggle(bar.name, zone)}
+                  />
+                ))}
               </ul>
             )}
           </div>
         );
-      })}
+      })
+      )}
 
       {photoFor && (
         <CheckInModal
           barName={photoFor.name}
           barNumber={checkedCount + 1}
           onCancel={() => setPhotoFor(null)}
-          onConfirm={async (evidenceUrl, note) => {
-            // First-6 photo check-ins require the Chicken's approval.
-            await doCheckIn(photoFor.name, photoFor.zone, evidenceUrl, note, "pending");
+          onConfirm={async (evidenceUrl, note, whatsappEvidence) => {
+            // First-6 check-ins require the Chicken's approval — whether the
+            // evidence is an in-app photo or confirmed-on-WhatsApp.
+            await doCheckIn(
+              photoFor.name,
+              photoFor.zone,
+              evidenceUrl,
+              note,
+              "pending",
+              whatsappEvidence,
+            );
             setPhotoFor(null);
           }}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * One bar row — used both in the grouped zone view and the flat search results.
+ * `showZone` adds a zone pill (search results span all zones). All per-bar
+ * behaviour (check-in toggle, ⏳ pending marker, Map link) is identical either way.
+ */
+function BarRow({
+  bar,
+  checked,
+  pending,
+  isBusy,
+  onToggle,
+  showZone = false,
+}: {
+  bar: Bar;
+  checked: boolean;
+  pending: boolean;
+  isBusy: boolean;
+  onToggle: () => void;
+  showZone?: boolean;
+}) {
+  return (
+    <li className="flex items-stretch border-b border-black/5">
+      <button
+        onClick={onToggle}
+        disabled={isBusy}
+        className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition active:bg-black/5 disabled:opacity-50"
+      >
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold transition ${
+            pending
+              ? "border-[var(--color-gold)] text-[var(--color-gold)]"
+              : checked
+                ? "border-transparent text-white"
+                : "border-black/25 text-transparent"
+          }`}
+          style={checked && !pending ? { backgroundColor: ZONES[bar.zone].color } : undefined}
+        >
+          {pending ? "⏳" : "✓"}
+        </span>
+        <span className="min-w-0">
+          <span
+            className={`font-semibold ${checked && !pending ? "line-through opacity-50" : ""}`}
+          >
+            {bar.name}
+          </span>
+          {showZone && (
+            <span
+              className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+              style={{ backgroundColor: ZONES[bar.zone].color }}
+            >
+              Zone {bar.zone}
+            </span>
+          )}
+          {pending && (
+            <span className="font-display ml-2 rounded-full bg-[var(--color-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-gold)]">
+              ⏳ Pending approval
+            </span>
+          )}
+        </span>
+      </button>
+      <a
+        href={mapsUrl(bar.name)}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${bar.name} in Google Maps`}
+        className="flex min-h-[56px] shrink-0 items-center gap-1 border-l border-black/5 px-3 text-xs font-bold text-[var(--color-zone-a)] transition active:bg-black/5"
+      >
+        📍 Map
+      </a>
+    </li>
   );
 }

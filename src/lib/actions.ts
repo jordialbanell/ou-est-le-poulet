@@ -139,6 +139,9 @@ export async function checkInBar(
   // First-6 photo check-ins pass "pending" (await Chicken approval). Bar 7+
   // omit this → the column default ('approved') keeps them instant.
   status?: "pending" | "approved",
+  // Team confirmed they sent the drink photo to the Chicken on WhatsApp instead
+  // of uploading it in-app (upload fallback when Cloudinary fails).
+  whatsappEvidence?: boolean,
 ) {
   const row: Record<string, unknown> = {
     game_id: gameId,
@@ -147,6 +150,7 @@ export async function checkInBar(
     zone,
     checkin_evidence_url: evidenceUrl || null,
     checkin_note: note?.trim() || null,
+    whatsapp_evidence: whatsappEvidence ?? false,
   };
   if (status) row.status = status;
   const { data, error } = await supabase
@@ -213,6 +217,7 @@ export interface SubmissionInput {
   evidenceUrl?: string | null;
   description?: string | null;
   messageToChicken?: string | null;
+  whatsappEvidence?: boolean;
 }
 
 export async function submitForApproval(
@@ -231,6 +236,7 @@ export async function submitForApproval(
     evidence_url: challenge.evidenceUrl || null,
     description: challenge.description?.trim() || null,
     message_to_chicken: challenge.messageToChicken?.trim() || null,
+    whatsapp_evidence: challenge.whatsappEvidence ?? false,
   });
   if (error) throw error;
 }

@@ -11,20 +11,28 @@ export function CheckInModal({
   barName: string;
   barNumber: number; // 1-based: which bar of the night this is
   onCancel: () => void;
-  onConfirm: (evidenceUrl: string, note: string) => Promise<void>;
+  onConfirm: (
+    evidenceUrl: string | null,
+    note: string,
+    whatsappEvidence: boolean,
+  ) => Promise<void>;
 }) {
   const [evidence, setEvidence] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [whatsapp, setWhatsapp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Need either an in-app photo or the WhatsApp confirmation to check in.
+  const canSubmit = !!evidence || whatsapp;
+
   async function confirm() {
-    if (!evidence) return;
+    if (!canSubmit) return;
     setBusy(true);
     setError(null);
     try {
-      await onConfirm(evidence, note);
+      await onConfirm(evidence, note, whatsapp);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check-in failed.");
       setBusy(false);
@@ -50,6 +58,22 @@ export function CheckInModal({
           />
         </div>
 
+        {/* Upload fallback: if Cloudinary is being flaky, confirm you sent it on WhatsApp. */}
+        <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-gold)]"
+          />
+          <span className="text-sm font-semibold leading-snug">
+            📲 Sent photo/video to the Chicken on WhatsApp
+            <span className="mt-0.5 block text-xs font-normal opacity-60">
+              Tick this if the upload won't go through — you can still check in.
+            </span>
+          </span>
+        </label>
+
         <label className="mb-1 mt-4 block text-xs font-bold uppercase tracking-wide opacity-60">
           Who's drinking? (optional)
         </label>
@@ -72,7 +96,7 @@ export function CheckInModal({
           </button>
           <button
             onClick={confirm}
-            disabled={!evidence || busy || uploading}
+            disabled={!canSubmit || busy || uploading}
             className="font-display min-h-[52px] flex-[2] rounded-2xl bg-[var(--color-gold)] text-base font-extrabold uppercase tracking-wide text-white transition active:scale-[0.98] disabled:opacity-50"
           >
             {uploading ? "Uploading…" : busy ? "Checking in…" : "Check In"}

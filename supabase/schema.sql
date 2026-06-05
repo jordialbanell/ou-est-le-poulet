@@ -231,3 +231,14 @@ alter table teams add column if not exists location_visible boolean default true
 -- DEFAULT 'approved' backfills all existing rows so current progress isn't lost.
 alter table bar_checkins
   add column if not exists status text not null default 'approved';
+
+-- ============================================================
+--  WhatsApp evidence fallback
+-- ============================================================
+
+-- When an in-app Cloudinary upload fails (flaky bar wifi / large files), a team
+-- can confirm they sent the photo/video to the Chicken on WhatsApp and still
+-- submit. This flag tells the admin to check WhatsApp before approving.
+-- DEFAULT false so existing rows are unaffected.
+alter table pending_challenges add column if not exists whatsapp_evidence boolean not null default false;
+alter table bar_checkins add column if not exists whatsapp_evidence boolean not null default false;

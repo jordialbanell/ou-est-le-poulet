@@ -28,6 +28,8 @@ interface Draft {
   description: string;
   message: string;
   uploading?: boolean;
+  /** Team confirmed they sent the evidence to the Chicken on WhatsApp instead. */
+  whatsapp?: boolean;
 }
 const EMPTY_DRAFT: Draft = { evidence: null, description: "", message: "" };
 
@@ -53,6 +55,7 @@ export function ChallengesTab({
   const toast = useToast();
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | Difficulty>("all");
+  const [query, setQuery] = useState("");
   // challenge id -> staged submission draft (before it's sent for approval)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
@@ -62,6 +65,17 @@ export function ChallengesTab({
 
   // "team" challenges only appear under All (no dedicated filter pill).
   const visibleDiffs = filter === "all" ? DIFFICULTY_ORDER : [filter];
+
+  // Search combines with the difficulty pill: a challenge shows only if it
+  // matches BOTH. Case-insensitive substring over name + description.
+  const q = query.trim().toLowerCase();
+  const matchesQuery = (c: Challenge) =>
+    !q || c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
+  const sections = visibleDiffs.map((diff) => ({
+    diff,
+    items: CHALLENGES.filter((c) => c.difficulty === diff && matchesQuery(c)),
+  }));
+  const anyMatch = sections.some((s) => s.items.length > 0);
 
   // challenge name -> this team's approved completion row
   const myCompletions = useMemo(() => {
@@ -110,6 +124,7 @@ export function ChallengesTab({
         evidenceUrl: draft.evidence,
         description: draft.description,
         messageToChicken: draft.message,
+        whatsappEvidence: draft.whatsapp,
       });
       // Drop the staged draft now that it's attached to a submission.
       setDrafts((d) => {
@@ -163,8 +178,27 @@ export function ChallengesTab({
         Submit a challenge and the Chicken approves it before points land.
       </p>
 
+      {/* Search — combines with the active difficulty pill. */}
+      <div className="relative">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search challenges…"
+          className="w-full rounded-xl border-2 border-black/15 bg-white/70 py-2 pl-3 pr-9 text-sm outline-none focus:border-[var(--color-gold)]"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-lg opacity-50 transition active:scale-90"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* Waiting: pushed challenges the team tapped "Later" on */}
-      {filter === "all" && laterPushes.length > 0 && (
+      {filter === "all" && !q && laterPushes.length > 0 && (
         <section className="flex flex-col gap-2">
           <div className="flex items-center gap-2 px-1">
             <h3 className="font-display text-lg font-bold text-[#6A1B9A]">
@@ -186,9 +220,10 @@ export function ChallengesTab({
         </section>
       )}
 
-      {visibleDiffs.map((diff) => {
+      {sections.map(({ diff, items }) => {
+        // While searching, drop sections with no matching challenges.
+        if (q && items.length === 0) return null;
         const meta = DIFFICULTY_META[diff];
-        const items = CHALLENGES.filter((c) => c.difficulty === diff);
         return (
           <section key={diff} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 px-1">
@@ -255,11 +290,23 @@ export function ChallengesTab({
                         compact
                         label={ch.requiresVideo ? "Add video" : "Add photo / video"}
                       />
-                      {requiresEvidence(ch) && !draft.evidence && (
+                      {requiresEvidence(ch) && !draft.evidence && !draft.whatsapp && (
                         <p className="text-xs font-semibold text-[var(--color-alert)]">
                           {ch.requiresVideo ? "🎥 Video" : "📷 Photo"} evidence required before submitting.
                         </p>
                       )}
+                      {/* Upload fallback: confirm evidence sent on WhatsApp when Cloudinary is flaky. */}
+                      <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={!!draft.whatsapp}
+                          onChange={(e) => patchDraft(ch.id, { whatsapp: e.target.checked })}
+                          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-gold)]"
+                        />
+                        <span className="text-sm font-semibold leading-snug">
+                          📲 Sent photo/video to the Chicken on WhatsApp
+                        </span>
+                      </label>
                       <input
                         value={draft.description}
                         onChange={(e) => patchDraft(ch.id, { description: e.target.value.slice(0, 280) })}
@@ -293,7 +340,7 @@ export function ChallengesTab({
                       points={ch.points}
                       busy={isBusy}
                       uploading={!!draft.uploading}
-                      blocked={requiresEvidence(ch) && !draft.evidence}
+                      blocked={requiresEvidence(ch) && !draft.evidence && !draft.whatsapp}
                       onSubmit={() => submit(ch)}
                     />
                     {diff === "team" && status !== "completed" && (
@@ -311,6 +358,10 @@ export function ChallengesTab({
           </section>
         );
       })}
+
+      {q && !anyMatch && (
+        <p className="py-6 text-center text-sm opacity-60">No challenges match “{query.trim()}”.</p>
+      )}
     </div>
   );
 }

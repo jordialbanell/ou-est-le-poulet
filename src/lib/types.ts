@@ -65,6 +65,12 @@ export interface BarCheckin {
    * approved everywhere via `status !== 'pending'`.
    */
   status: "pending" | "approved" | null;
+  /**
+   * Team confirmed they sent the drink photo/video to the Chicken on WhatsApp
+   * instead of (or as well as) uploading it in-app. Lets the check-in go through
+   * when a Cloudinary upload fails. Legacy rows may be null → treated as false.
+   */
+  whatsapp_evidence: boolean | null;
 }
 
 export interface ChallengeCompletion {
@@ -105,4 +111,10 @@ export interface PendingChallenge {
   description: string | null;
   message_to_chicken: string | null;
   rejection_reason: string | null;
+  /**
+   * Team confirmed they sent the evidence to the Chicken on WhatsApp instead of
+   * (or as well as) uploading it in-app. Lets a submission go through when a
+   * Cloudinary upload fails. Legacy rows may be null → treated as false.
+   */
+  whatsapp_evidence: boolean | null;
 }
