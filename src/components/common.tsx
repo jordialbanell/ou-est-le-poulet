@@ -118,6 +118,57 @@ export function RefreshButton({
   );
 }
 
+/**
+ * Always-pressable refresh button + "Updated Xs ago" stamp (player home).
+ * The spinner only shows on a manual press; the 30s background poll updates
+ * `lastRefreshed` quietly via the parent, with no spinner. Ticks once a second
+ * so the relative label stays fresh — matching the admin queue wording.
+ */
+export function LiveRefresh({
+  onRefresh,
+  lastRefreshed,
+}: {
+  onRefresh: () => Promise<void> | void;
+  lastRefreshed: number;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function go() {
+    setBusy(true);
+    try {
+      await onRefresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const secondsAgo = Math.max(0, Math.round((now - lastRefreshed) / 1000));
+  const agoLabel =
+    secondsAgo < 60
+      ? `${secondsAgo}s ago`
+      : `${Math.floor(secondsAgo / 60)}m ${secondsAgo % 60}s ago`;
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={go}
+        aria-label="Refresh"
+        className="flex items-center gap-1.5 rounded-full border-2 border-black/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition active:scale-95"
+      >
+        <span className={busy ? "inline-block animate-spin" : "inline-block"}>↻</span>
+        Refresh
+      </button>
+      <span className="text-xs font-semibold opacity-50">Updated {agoLabel}</span>
+    </div>
+  );
+}
+
 /** Parse a same-night "HH:MM" deadline into today's Date (null if malformed). */
 function deadlineToDate(hhmm: string): Date | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());

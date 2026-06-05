@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTeam } from "../hooks/useTeam";
 import { useGame } from "../hooks/useGame";
@@ -43,6 +43,19 @@ export function PlayShell() {
 
   const state = useGame(team?.gameId ?? null, team?.teamId ?? null);
   const laterPushes = useLaterPushes(team?.teamId ?? null);
+
+  // Manual + 30s background refresh share one fetch (state.refresh) and stamp
+  // the same "last refreshed" time. The poll is quiet — state updates in place,
+  // no spinner, no remount.
+  const [lastRefreshed, setLastRefreshed] = useState(() => Date.now());
+  const doRefresh = useCallback(async () => {
+    await state.refresh();
+    setLastRefreshed(Date.now());
+  }, [state.refresh]);
+  useEffect(() => {
+    const id = setInterval(() => void doRefresh(), 30_000);
+    return () => clearInterval(id);
+  }, [doRefresh]);
 
   // Share this team's live GPS while playing.
   const { status: geoStatus } = useGeoTracking(
@@ -172,7 +185,8 @@ export function PlayShell() {
             pending={state.pendingChallenges}
             chickenLocation={state.game?.chicken_location ?? null}
             onRenamed={(name) => setTeam({ ...team, teamName: name })}
-            onRefresh={state.refresh}
+            onRefresh={doRefresh}
+            lastRefreshed={lastRefreshed}
           />
         )}
         {tab === "bars" && (

@@ -186,6 +186,14 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
     setLocation(state.game?.chicken_location ?? "");
   }, [state.game?.chicken_location]);
 
+  // Quiet 30s background refresh so both approval queues (and their "Updated
+  // Xs ago" stamps) stay current without pressing Refresh. Reuses state.refresh
+  // — updates in place, no spinner. One interval, cleaned up on unmount.
+  useEffect(() => {
+    const id = setInterval(() => void state.refresh(), 30_000);
+    return () => clearInterval(id);
+  }, [state.refresh]);
+
   const rows = computeLeaderboard(state.teams, state.checkins, state.completions);
   const joinUrl = `${window.location.origin}/?code=${code}`;
 

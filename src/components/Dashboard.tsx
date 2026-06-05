@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { POINTS_TO_WIN } from "../lib/data";
 import { computeWinStatus, MANDATORY_DRINK_BARS } from "../lib/scoring";
 import type { BarCheckin, ChallengeCompletion, PendingChallenge, Team } from "../lib/types";
-import { PointsCounter, ProgressBar, RefreshButton, ZonePills } from "./common";
+import { LiveRefresh, PointsCounter, ProgressBar, ZonePills } from "./common";
 import { RulesModal } from "./RulesModal";
 import { EditTeamModal } from "./EditTeamModal";
 import { isVideoUrl } from "../lib/cloudinary";
@@ -27,6 +27,7 @@ export function Dashboard({
   chickenLocation,
   onRenamed,
   onRefresh,
+  lastRefreshed,
 }: {
   team: Team | null;
   teamId: string;
@@ -38,6 +39,7 @@ export function Dashboard({
   chickenLocation: string | null;
   onRenamed: (name: string) => void;
   onRefresh: () => Promise<void>;
+  lastRefreshed: number;
 }) {
   const status = computeWinStatus(teamId, checkins, completions);
   const [showRules, setShowRules] = useState(false);
@@ -66,9 +68,9 @@ export function Dashboard({
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
-      {/* Refresh */}
-      <div className="flex justify-end">
-        <RefreshButton onRefresh={onRefresh} label="See latest scores" />
+      {/* Pinned, always-pressable refresh + last-updated stamp */}
+      <div className="sticky top-0 z-10 -mx-4 flex bg-[var(--color-paper)]/95 px-4 py-2 backdrop-blur">
+        <LiveRefresh onRefresh={onRefresh} lastRefreshed={lastRefreshed} />
       </div>
 
       {/* Team header */}
