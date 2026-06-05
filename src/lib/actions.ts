@@ -113,6 +113,25 @@ export async function updateTeam(
   return data;
 }
 
+/** Admin: show/hide a single team's live pin on the player + admin maps. */
+export async function setTeamLocationVisible(teamId: string, visible: boolean) {
+  const { error } = await supabase
+    .from("teams")
+    .update({ location_visible: visible })
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
+/** Admin: show/hide every team's live pin at once. */
+export async function setAllTeamsLocationVisible(teamIds: string[], visible: boolean) {
+  if (teamIds.length === 0) return;
+  const { error } = await supabase
+    .from("teams")
+    .update({ location_visible: visible })
+    .in("id", teamIds);
+  if (error) throw error;
+}
+
 export async function checkInBar(
   gameId: string,
   teamId: string,

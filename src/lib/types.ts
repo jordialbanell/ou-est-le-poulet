@@ -20,6 +20,8 @@ export interface Team {
   team_code: string | null;
   /** When this team last opened its chat with the Chicken. */
   last_read_at: string | null;
+  /** Admin toggle — when false this team's live pin is hidden from all maps. */
+  location_visible: boolean | null;
 }
 
 export interface AdminReadReceipt {

@@ -40,6 +40,7 @@ export interface GameState {
   refresh: () => Promise<void>;
   refreshPending: () => Promise<void>;
   refreshCompletions: () => Promise<void>;
+  refreshTeams: () => Promise<void>;
 }
 
 /**
@@ -424,5 +425,6 @@ export function useGame(gameId: string | null, notifyTeamId?: string | null): Ga
     refresh,
     refreshPending: fetchPending,
     refreshCompletions: fetchCompletions,
+    refreshTeams: fetchTeams,
   };
 }

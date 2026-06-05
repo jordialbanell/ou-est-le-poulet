@@ -211,3 +211,11 @@ drop policy if exists "Public update" on admin_read_receipts;
 create policy "Public read"   on admin_read_receipts for select using (true);
 create policy "Public insert" on admin_read_receipts for insert with check (true);
 create policy "Public update" on admin_read_receipts for update using (true);
+
+-- ============================================================
+--  Admin live map: per-team location visibility toggle
+-- ============================================================
+
+-- When false, a team's live pin is hidden from BOTH the player-facing map
+-- (other teams can't see them) and the admin map. Default true (visible).
+alter table teams add column if not exists location_visible boolean default true;

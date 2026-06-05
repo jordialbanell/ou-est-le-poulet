@@ -21,6 +21,7 @@ import { evidenceByChallengeName } from "../lib/evidence";
 import { computeLeaderboard } from "../lib/scoring";
 import { ZonePills, Spinner, LiveDot, RefreshButton } from "./common";
 import { ChatThread } from "./ChatThread";
+import { AdminMap } from "./AdminMap";
 import { Gallery } from "./Gallery";
 import { useToast } from "./Toast";
 import type {
@@ -258,6 +259,13 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         teams={state.teams}
         messages={state.messages}
         receipts={state.adminReadReceipts}
+      />
+
+      {/* Live map — all bars + every team's live pin, with show/hide toggles */}
+      <AdminMap
+        teams={state.teams}
+        teamLocations={state.teamLocations}
+        onChanged={state.refreshTeams}
       />
 
       {/* Share link */}

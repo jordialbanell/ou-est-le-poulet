@@ -1,36 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
-import { BARS, ZONES, type Bar, type Zone } from "../lib/data";
+import { ZONES, type Bar, type Zone } from "../lib/data";
 import type { Team, TeamLocation } from "../lib/types";
 import type { GeoStatus } from "../hooks/useGeoTracking";
+import { BAR_PINS, MAP_CENTER, circleIcon, circularAvatar, mapsUrl, poopIcon } from "./mapShared";
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const MAP_CENTER = { lat: 1.288, lng: 103.847 };
-
-const mapsUrl = (barName: string) =>
-  `https://www.google.com/maps/search/${encodeURIComponent(`${barName} Singapore`)}`;
-
-const circleIcon = (color: string, size = 24) =>
-  "data:image/svg+xml;charset=UTF-8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="${color}" stroke="white" stroke-width="3"/></svg>`,
-  );
-
-// 💩 emoji pin for teams without a selfie.
-const poopIcon = () =>
-  "data:image/svg+xml;charset=UTF-8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><text x="18" y="28" font-size="26" text-anchor="middle">💩</text></svg>`,
-  );
-
-// Turn a Cloudinary selfie URL into a circular, white-bordered avatar.
-function circularAvatar(url: string, px = 40): string {
-  const marker = "/upload/";
-  const i = url.indexOf(marker);
-  if (i === -1) return url; // not a Cloudinary URL — use as-is
-  const tx = `c_fill,g_auto,w_${px},h_${px},r_max,bo_3px_solid_white,f_auto`;
-  return url.slice(0, i + marker.length) + tx + "/" + url.slice(i + marker.length);
-}
 
 /** Pans the map when a target position is set (e.g. after "Find Me"). */
 function Recenter({ pos }: { pos: google.maps.LatLngLiteral | null }) {
@@ -59,11 +34,6 @@ export function MapTab({
   const [userPos, setUserPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [findError, setFindError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
-
-  const barPins = useMemo(
-    () => BARS.map((bar) => ({ bar, pos: { lat: bar.lat, lng: bar.lng } })),
-    [],
-  );
 
   const teamById = useMemo(() => {
     const m = new Map<string, Team>();
@@ -143,7 +113,7 @@ export function MapTab({
             style={{ width: "100%", height: "100%" }}
           >
             {/* Bar markers, colour-coded by zone */}
-            {barPins.map(({ bar, pos }) => (
+            {BAR_PINS.map(({ bar, pos }) => (
               <Marker
                 key={bar.name}
                 position={pos}
@@ -156,8 +126,11 @@ export function MapTab({
             {/* Team live locations */}
             {[...latestByTeam.values()].map((loc) => {
               const team = teamById.get(loc.team_id);
+              // Skip pins for unknown teams (e.g. a stray admin location row).
               if (!team) return null;
               const isMe = team.id === currentTeamId;
+              // Admin-hidden teams vanish for everyone else; you still see yourself.
+              if (team.location_visible === false && !isMe) return null;
               return (
                 <Marker
                   key={loc.team_id}
