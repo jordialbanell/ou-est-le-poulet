@@ -15,7 +15,7 @@ import { WinBanner } from "./WinBanner";
 import { PushedChallengeToast } from "./PushedChallengeToast";
 import { AlertBanner } from "./AlertBanner";
 import { ChatModal } from "./ChatModal";
-import { LiveDot, Spinner } from "./common";
+import { LiveDot, LiveRefresh, Spinner } from "./common";
 import { markTeamRead } from "../lib/actions";
 
 type Tab = "home" | "bars" | "challenges" | "leaderboard" | "map";
@@ -148,8 +148,9 @@ export function PlayShell() {
             <p className="text-[11px] font-semibold opacity-50">Game #{team.gameCode}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <LiveDot connected={state.connected} />
+          <LiveRefresh onRefresh={doRefresh} lastRefreshed={lastRefreshed} compact />
           <button
             onClick={openChat}
             aria-label="Chat with the Chicken"
@@ -186,7 +187,6 @@ export function PlayShell() {
             chickenLocation={state.game?.chicken_location ?? null}
             onRenamed={(name) => setTeam({ ...team, teamName: name })}
             onRefresh={doRefresh}
-            lastRefreshed={lastRefreshed}
           />
         )}
         {tab === "bars" && (

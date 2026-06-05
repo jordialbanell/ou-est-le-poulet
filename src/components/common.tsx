@@ -127,9 +127,12 @@ export function RefreshButton({
 export function LiveRefresh({
   onRefresh,
   lastRefreshed,
+  compact = false,
 }: {
   onRefresh: () => Promise<void> | void;
   lastRefreshed: number;
+  /** Header variant: icon-only ↻ + tiny timestamp, to fit a crowded top bar. */
+  compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -153,6 +156,23 @@ export function LiveRefresh({
     secondsAgo < 60
       ? `${secondsAgo}s ago`
       : `${Math.floor(secondsAgo / 60)}m ${secondsAgo % 60}s ago`;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={go}
+          aria-label="Refresh"
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-black/15 text-sm transition active:scale-90"
+        >
+          <span className={busy ? "inline-block animate-spin" : "inline-block"}>↻</span>
+        </button>
+        <span className="whitespace-nowrap text-[10px] font-semibold leading-none opacity-50">
+          {agoLabel}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">

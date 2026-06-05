@@ -110,9 +110,11 @@ create policy "Public update" on teams for update using (true);  -- edit team on
 
 drop policy if exists "Public read" on bar_checkins;
 drop policy if exists "Public insert" on bar_checkins;
+drop policy if exists "Public update" on bar_checkins;
 drop policy if exists "Public delete" on bar_checkins;
 create policy "Public read"   on bar_checkins for select using (true);
 create policy "Public insert" on bar_checkins for insert with check (true);
+create policy "Public update" on bar_checkins for update using (true);  -- admin approves check-ins
 create policy "Public delete" on bar_checkins for delete using (true);
 
 drop policy if exists "Public read" on challenge_completions;
