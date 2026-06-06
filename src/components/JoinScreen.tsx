@@ -16,8 +16,16 @@ export function JoinScreen() {
   const { setTeam } = useTeam();
   const [params] = useSearchParams();
 
+  // Team-invite links carry ?team=<teamCode> (the TEAM code) alongside the
+  // ?code=<gameCode> game param — distinct params so they never collide. When
+  // present, jump straight to the join-by-team-code path with it prefilled.
+  const teamParam = (params.get("team") ?? "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 6);
+
   const [code, setCode] = useState(params.get("code") ?? "");
-  const [mode, setMode] = useState<Mode>("choose");
+  const [mode, setMode] = useState<Mode>(teamParam ? "join" : "choose");
 
   // Create flow
   const [name, setName] = useState("");
@@ -26,7 +34,7 @@ export function JoinScreen() {
   const [createdCode, setCreatedCode] = useState<string | null>(null);
 
   // Join flow
-  const [teamCode, setTeamCode] = useState("");
+  const [teamCode, setTeamCode] = useState(teamParam);
   const [foundTeam, setFoundTeam] = useState<Team | null>(null);
   const [foundGame, setFoundGame] = useState<Game | null>(null);
 
@@ -136,7 +144,9 @@ export function JoinScreen() {
 
   // ── Share screen after creating a team ──────────────────────────
   if (createdCode !== null) {
-    return <TeamCreated code={createdCode} onContinue={() => navigate("/play")} />;
+    return (
+      <TeamCreated code={createdCode} gameCode={code} onContinue={() => navigate("/play")} />
+    );
   }
 
   return (
@@ -334,11 +344,27 @@ export function JoinScreen() {
 }
 
 /** Big shareable "your team code is …" screen shown right after creating. */
-function TeamCreated({ code, onContinue }: { code: string; onContinue: () => void }) {
+function TeamCreated({
+  code,
+  gameCode,
+  onContinue,
+}: {
+  code: string;
+  gameCode: string;
+  onContinue: () => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  // ?code= prefills the GAME code, ?team= prefills THIS team's code — tapping the
+  // link lands teammates on the join-by-team-code path for this exact team.
+  const joinUrl = `${window.location.origin}/?code=${gameCode}&team=${code}`;
   function copy() {
     void navigator.clipboard?.writeText(code);
     setCopied(true);
+  }
+  function copyLink() {
+    void navigator.clipboard?.writeText(joinUrl);
+    setLinkCopied(true);
   }
   return (
     <div className="safe-top flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">
@@ -362,6 +388,15 @@ function TeamCreated({ code, onContinue }: { code: string; onContinue: () => voi
         >
           {copied ? "Copied! ✓" : "Copy code"}
         </button>
+        <button
+          onClick={copyLink}
+          className="font-display mb-3 min-h-[52px] w-full rounded-2xl border-2 border-black/20 bg-[var(--color-paper)] text-base font-extrabold uppercase tracking-wide transition active:scale-[0.98]"
+        >
+          {linkCopied ? "Copied! ✓" : "📲 Copy join link"}
+        </button>
+        <p className="mb-3 text-xs opacity-50">
+          Paste the link into WhatsApp — teammates tap it to join this team.
+        </p>
         <button
           onClick={onContinue}
           className="font-display min-h-[56px] w-full rounded-2xl bg-[var(--color-gold)] text-lg font-extrabold uppercase tracking-wide text-white shadow-lg shadow-[var(--color-gold)]/30 transition active:scale-[0.98]"
