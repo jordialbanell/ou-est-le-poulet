@@ -256,6 +256,34 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         </div>
       </div>
 
+      {/* Shareable join link — paste into WhatsApp to invite every team. */}
+      <section className="rounded-2xl border-2 border-[var(--color-gold)]/60 bg-[var(--color-gold)]/5 p-4">
+        <h2 className="font-display mb-1 text-sm font-bold uppercase tracking-widest text-[var(--color-gold)]">
+          Share Join Link
+        </h2>
+        <p className="mb-3 text-xs opacity-60">
+          Paste into WhatsApp — teams tap it and land on the join screen with the game code filled in.
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            readOnly
+            value={joinUrl}
+            onFocus={(e) => e.target.select()}
+            className="min-w-0 flex-1 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] px-3 py-2 text-sm"
+          />
+          <button
+            onClick={() => {
+              void navigator.clipboard?.writeText(joinUrl);
+              toast("Link copied!", "success");
+            }}
+            className="font-display shrink-0 rounded-xl bg-[var(--color-gold)] px-4 py-2 text-sm font-bold uppercase tracking-wide text-white transition active:scale-[0.98]"
+          >
+            Copy link
+          </button>
+        </div>
+        <p className="mt-2 font-display text-4xl font-extrabold tracking-[0.3em]">{code}</p>
+      </section>
+
       {/* Approval queue */}
       <ApprovalQueue
         gameId={gameId}
@@ -285,27 +313,6 @@ function AdminDashboard({ gameId, code }: { gameId: string; code: string }) {
         teamLocations={state.teamLocations}
         onChanged={state.refreshTeams}
       />
-
-      {/* Share link */}
-      <Card title="Join Link">
-        <div className="flex items-center gap-2">
-          <input
-            readOnly
-            value={joinUrl}
-            className="min-w-0 flex-1 rounded-xl border-2 border-black/10 bg-[var(--color-paper)] px-3 py-2 text-sm"
-          />
-          <button
-            onClick={() => {
-              void navigator.clipboard?.writeText(joinUrl);
-              toast("Link copied!", "success");
-            }}
-            className="font-display rounded-xl bg-[var(--color-gold)] px-3 py-2 text-sm font-bold text-white"
-          >
-            Copy
-          </button>
-        </div>
-        <p className="mt-2 font-display text-4xl font-extrabold tracking-[0.3em]">{code}</p>
-      </Card>
 
       {/* Reveal chicken */}
       <Card title="Reveal the Chicken">
