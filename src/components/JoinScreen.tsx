@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { findGameByCode, findTeamByCode, joinTeam } from "../lib/actions";
 import { supabase, supabaseConfigured } from "../lib/supabase";
@@ -343,6 +343,28 @@ export function JoinScreen() {
   );
 }
 
+/**
+ * A "just copied" flag that auto-reverts after `ms`. Returns the current flag
+ * and a `mark()` to trigger it. Each call is independent and clears its pending
+ * timer on re-trigger and on unmount, so it never fires after the component is gone.
+ */
+function useCopiedFlag(ms = 2000): [boolean, () => void] {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  const mark = useCallback(() => {
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), ms);
+  }, [ms]);
+  return [copied, mark];
+}
+
 /** Big shareable "your team code is …" screen shown right after creating. */
 function TeamCreated({
   code,
@@ -353,18 +375,19 @@ function TeamCreated({
   gameCode: string;
   onContinue: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
+  // Each button reverts its own "Copied!" label after ~2s; timers self-clean.
+  const [copied, markCopied] = useCopiedFlag();
+  const [linkCopied, markLinkCopied] = useCopiedFlag();
   // ?code= prefills the GAME code, ?team= prefills THIS team's code — tapping the
   // link lands teammates on the join-by-team-code path for this exact team.
   const joinUrl = `${window.location.origin}/?code=${gameCode}&team=${code}`;
   function copy() {
     void navigator.clipboard?.writeText(code);
-    setCopied(true);
+    markCopied();
   }
   function copyLink() {
     void navigator.clipboard?.writeText(joinUrl);
-    setLinkCopied(true);
+    markLinkCopied();
   }
   return (
     <div className="safe-top flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">

@@ -49,11 +49,15 @@ export function Dashboard({
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   // Re-share this team's join link mid-game. Same ?code=<game>&team=<teamCode>
-  // format as the "Your team is ready!" screen. Prefer the native share sheet
-  // (straight to WhatsApp); fall back to copy-to-clipboard + the existing toast.
+  // format as the "Your team is ready!" screen.
+  const joinUrl = team?.team_code
+    ? `${window.location.origin}/?code=${gameCode}&team=${team.team_code}`
+    : null;
+
+  // Native share sheet (straight to WhatsApp); falls back to a plain copy when
+  // the device has no share support.
   async function invite() {
-    if (!team?.team_code) return;
-    const joinUrl = `${window.location.origin}/?code=${gameCode}&team=${team.team_code}`;
+    if (!joinUrl) return;
     if (navigator.share) {
       try {
         await navigator.share({ text: `Join ${teamName} in Où Est Le Poulet 🍗`, url: joinUrl });
@@ -62,6 +66,12 @@ export function Dashboard({
       }
       return;
     }
+    copyLink();
+  }
+
+  // Plain copy-to-clipboard, bypassing the share sheet.
+  function copyLink() {
+    if (!joinUrl) return;
     void navigator.clipboard?.writeText(joinUrl);
     toast("Link copied!", "success");
   }
@@ -106,12 +116,20 @@ export function Dashboard({
             </p>
           )}
           {team?.team_code && (
-            <button
-              onClick={invite}
-              className="font-display mt-1.5 inline-flex items-center gap-1 rounded-lg border-2 border-black/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition active:scale-95"
-            >
-              📲 Invite with link
-            </button>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              <button
+                onClick={invite}
+                className="font-display inline-flex items-center gap-1 rounded-lg border-2 border-black/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition active:scale-95"
+              >
+                📲 Invite with link
+              </button>
+              <button
+                onClick={copyLink}
+                className="font-display inline-flex items-center gap-1 rounded-lg border-2 border-black/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition active:scale-95"
+              >
+                Copy link
+              </button>
+            </div>
           )}
         </div>
         <button
