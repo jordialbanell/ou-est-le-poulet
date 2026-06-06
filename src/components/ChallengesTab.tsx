@@ -26,12 +26,11 @@ type CardStatus = "completed" | "pending" | "rejected" | "open";
 interface Draft {
   evidence: string | null;
   description: string;
-  message: string;
   uploading?: boolean;
   /** Team confirmed they sent the evidence to the Chicken on WhatsApp instead. */
   whatsapp?: boolean;
 }
-const EMPTY_DRAFT: Draft = { evidence: null, description: "", message: "" };
+const EMPTY_DRAFT: Draft = { evidence: null, description: "" };
 
 const requiresEvidence = (ch: Challenge) => Boolean(ch.requiresPhoto || ch.requiresVideo);
 
@@ -123,7 +122,6 @@ export function ChallengesTab({
         difficulty: ch.difficulty,
         evidenceUrl: draft.evidence,
         description: draft.description,
-        messageToChicken: draft.message,
         whatsappEvidence: draft.whatsapp,
       });
       // Drop the staged draft now that it's attached to a submission.
@@ -311,12 +309,6 @@ export function ChallengesTab({
                         value={draft.description}
                         onChange={(e) => patchDraft(ch.id, { description: e.target.value.slice(0, 280) })}
                         placeholder="Your side of the story. Make it convincing."
-                        className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
-                      />
-                      <input
-                        value={draft.message}
-                        onChange={(e) => patchDraft(ch.id, { message: e.target.value.slice(0, 280) })}
-                        placeholder="Beg. It sometimes works."
                         className="w-full rounded-xl border-2 border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-[var(--color-gold)]"
                       />
                     </div>
