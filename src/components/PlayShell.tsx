@@ -181,6 +181,7 @@ export function PlayShell() {
             teamId={team.teamId}
             teamName={teamName}
             teamColor={teamColor}
+            gameCode={team.gameCode}
             checkins={state.checkins}
             completions={state.completions}
             pending={state.pendingChallenges}

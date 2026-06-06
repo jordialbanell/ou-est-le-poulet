@@ -5,6 +5,7 @@ import type { BarCheckin, ChallengeCompletion, PendingChallenge, Team } from "..
 import { PointsCounter, ProgressBar, ZonePills } from "./common";
 import { RulesModal } from "./RulesModal";
 import { EditTeamModal } from "./EditTeamModal";
+import { useToast } from "./Toast";
 import { isVideoUrl } from "../lib/cloudinary";
 import { evidenceByChallengeName } from "../lib/evidence";
 
@@ -21,6 +22,7 @@ export function Dashboard({
   teamId,
   teamName,
   teamColor,
+  gameCode,
   checkins,
   completions,
   pending,
@@ -32,6 +34,7 @@ export function Dashboard({
   teamId: string;
   teamName: string;
   teamColor: string;
+  gameCode: string;
   checkins: BarCheckin[];
   completions: ChallengeCompletion[];
   pending: PendingChallenge[];
@@ -40,9 +43,28 @@ export function Dashboard({
   onRefresh: () => Promise<void>;
 }) {
   const status = computeWinStatus(teamId, checkins, completions);
+  const toast = useToast();
   const [showRules, setShowRules] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Re-share this team's join link mid-game. Same ?code=<game>&team=<teamCode>
+  // format as the "Your team is ready!" screen. Prefer the native share sheet
+  // (straight to WhatsApp); fall back to copy-to-clipboard + the existing toast.
+  async function invite() {
+    if (!team?.team_code) return;
+    const joinUrl = `${window.location.origin}/?code=${gameCode}&team=${team.team_code}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: `Join ${teamName} in Où Est Le Poulet 🍗`, url: joinUrl });
+      } catch {
+        // Share sheet dismissed / cancelled — nothing to do.
+      }
+      return;
+    }
+    void navigator.clipboard?.writeText(joinUrl);
+    toast("Link copied!", "success");
+  }
 
   const myCompletions = useMemo(
     () =>
@@ -82,6 +104,14 @@ export function Dashboard({
             <p className="mt-0.5 text-xs font-semibold opacity-50">
               Team code: <span className="font-bold tracking-wider">{team.team_code}</span>
             </p>
+          )}
+          {team?.team_code && (
+            <button
+              onClick={invite}
+              className="font-display mt-1.5 inline-flex items-center gap-1 rounded-lg border-2 border-black/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition active:scale-95"
+            >
+              📲 Invite with link
+            </button>
           )}
         </div>
         <button
