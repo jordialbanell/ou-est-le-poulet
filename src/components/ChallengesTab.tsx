@@ -19,6 +19,7 @@ const FILTERS: { id: "all" | Difficulty; label: string }[] = [
   { id: "medium", label: "Medium (2pt)" },
   { id: "hard", label: "Hard (3pt)" },
   { id: "bonus", label: "Bonus" },
+  { id: "team", label: "Team vs Team" },
 ];
 
 type CardStatus = "completed" | "pending" | "rejected" | "open";
@@ -55,6 +56,8 @@ export function ChallengesTab({
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | Difficulty>("all");
   const [query, setQuery] = useState("");
+  // Accordion: id of the one expanded card (null = all collapsed).
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   // challenge id -> staged submission draft (before it's sent for approval)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
@@ -242,6 +245,7 @@ export function ChallengesTab({
               const done = status === "completed";
               const draft = getDraft(ch.id);
               const pendingRow = myPending.get(ch.id);
+              const expanded = expandedId === ch.id;
               return (
                 <div
                   key={ch.id}
@@ -255,13 +259,28 @@ export function ChallengesTab({
                           : "border-black/10 bg-white/50"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId((cur) => (cur === ch.id ? null : ch.id))}
+                    aria-expanded={expanded}
+                    className="flex w-full items-start gap-3 text-left"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className={`font-display font-bold ${done ? "line-through" : ""}`}>
                           {ch.name}
                         </p>
                         <EvidenceIcon ch={ch} />
+                        {status === "completed" && (
+                          <span className="rounded-md bg-green-600/15 px-1.5 py-0.5 text-xs font-bold text-green-700">
+                            ✓ approved
+                          </span>
+                        )}
+                        {status === "pending" && (
+                          <span className="rounded-md bg-[var(--color-gold)]/20 px-1.5 py-0.5 text-xs font-bold text-[var(--color-gold)]">
+                            ⏳ pending
+                          </span>
+                        )}
                         {status === "rejected" && (
                           <span className="rounded-md bg-[var(--color-alert)]/15 px-1.5 py-0.5 text-xs font-bold text-[var(--color-alert)]">
                             ✕ rejected
@@ -276,8 +295,15 @@ export function ChallengesTab({
                     >
                       +{ch.points}
                     </span>
-                  </div>
+                    <span
+                      className={`shrink-0 text-lg leading-none opacity-50 transition-transform ${expanded ? "rotate-180" : ""}`}
+                    >
+                      ⌄
+                    </span>
+                  </button>
 
+                  {expanded && (
+                    <>
                   {/* Submission form — shown when the team can (re)submit */}
                   {(status === "open" || status === "rejected") && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -344,6 +370,8 @@ export function ChallengesTab({
                       </button>
                     )}
                   </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -458,13 +486,18 @@ function FilterPills({
       >
         {FILTERS.map((f) => {
           const active = value === f.id;
+          // Team vs Team uses the section's purple accent; the rest use gold.
+          const isTeam = f.id === "team";
           return (
             <button
               key={f.id}
               onClick={() => onChange(f.id)}
+              style={active && isTeam ? { backgroundColor: "#6A1B9A", borderColor: "#6A1B9A" } : undefined}
               className={`font-display min-h-[36px] shrink-0 snap-start whitespace-nowrap rounded-full border-2 px-4 text-sm font-bold transition active:scale-95 ${
                 active
-                  ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-white shadow-md shadow-[var(--color-gold)]/30"
+                  ? isTeam
+                    ? "text-white shadow-md"
+                    : "border-[var(--color-gold)] bg-[var(--color-gold)] text-white shadow-md shadow-[var(--color-gold)]/30"
                   : "border-black/15 bg-white/50 text-ink"
               }`}
             >
