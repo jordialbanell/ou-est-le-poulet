@@ -1,3 +1,6 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "redirects": [
+    { "source": "/", "destination": "https://jordialbanell.com/poulet/", "permanent": true },
+    { "source": "/:path*", "destination": "https://jordialbanell.com/poulet/:path*", "permanent": true }
+  ]
 }

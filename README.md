@@ -1,5 +1,7 @@
 # Où Est Le Poulet 🍗
 
+> Live at **https://jordialbanell.com/poulet** since 23 Nov 2026. The old ou-est-le-poulet-ten.vercel.app address redirects there (see `vercel.json`). The jordialbanell.com build is made from this repo by `demos/build-oelp-live.py` in jordialbanell/jordialbanell, with tables prefixed `oelp_`.
+
 A real-time multiplayer pub crawl tracker. Teams race across ~37 bars in 3 zones,
 complete challenges for points, and the first team to visit all zones **and** hit
 20 points can sit down with the Chicken to claim the prize.
