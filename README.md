@@ -53,3 +53,11 @@ A team can sit down when they have:
 | `npm run build` | Type-check + production build |
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | Type-check only |
+
+## Licence and credit
+
+MIT licence, copyright (c) 2026 Jordi Albanell. See [LICENSE](LICENSE).
+
+In plain words: you can use this code, change it, share it and build on it, including for paid work. The one legal condition is that **every copy keeps the copyright line and the LICENSE file**, so the code always says where it came from. Removing them breaks the licence.
+
+If you put something live that's built on it, a "Based on Où est le poulet by [Jordi Albanell](https://jordialbanell.com)" link is appreciated.
